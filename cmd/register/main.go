@@ -61,7 +61,7 @@ func main() {
 		}()
 
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 			handle, err := resp.Add(srv)
 			if err != nil {
 				fmt.Println(err)
