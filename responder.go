@@ -221,44 +221,7 @@ func (r *responder) respond(ctx context.Context) error {
 		select {
 		case req := <-ch:
 			r.mutex.Lock()
-			if len(r.managed) == 0 {
-				r.mutex.Unlock()
-				// Ignore requests when no services are managed
-				break
-			}
-
-			// If messages is truncated, we wait for the next message to come (RFC6762 18.5)
-			if req.msg.Truncated {
-				r.truncated = req
-				r.mutex.Unlock()
-				log.Debug.Println("Waiting for additional answers...")
-				break
-			}
-
-			// append request
-			if r.truncated != nil && r.truncated.from.IP.Equal(req.from.IP) {
-				log.Debug.Println("Add answers to truncated message")
-				msgs := []*dns.Msg{r.truncated.msg, req.msg}
-				r.truncated = nil
-				req.msg = mergeMsgs(msgs)
-			}
-
-			// Conflicting records remove managed services from
-			// the responder and trigger reprobing
-			conflicts := findConflicts(req, r.managed)
-			for _, h := range conflicts {
-				log.Debug.Println("Reprobe for", h.service)
-				go r.reprobe(h)
-
-				for i, m := range r.managed {
-					if h == m {
-						r.managed = append(r.managed[:i], r.managed[i+1:]...)
-						break
-					}
-				}
-			}
-
-			r.handleQuery(req, services(r.managed))
+			r.handleRequest(req)
 			r.mutex.Unlock()
 
 		case <-ctx.Done():
@@ -268,6 +231,45 @@ func (r *responder) respond(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+func (r *responder) handleRequest(req *Request) {
+	if len(r.managed) == 0 {
+		// Ignore requests when no services are managed
+		return
+	}
+
+	// If messages is truncated, we wait for the next message to come (RFC6762 18.5)
+	if req.msg.Truncated {
+		r.truncated = req
+		log.Debug.Println("Waiting for additional answers...")
+		return
+	}
+
+	// append request
+	if r.truncated != nil && r.truncated.from.IP.Equal(req.from.IP) {
+		log.Debug.Println("Add answers to truncated message")
+		msgs := []*dns.Msg{r.truncated.msg, req.msg}
+		r.truncated = nil
+		req.msg = mergeMsgs(msgs)
+	}
+
+	// Conflicting records remove managed services from
+	// the responder and trigger reprobing
+	conflicts := findConflicts(req, r.managed)
+	for _, h := range conflicts {
+		log.Debug.Println("Reprobe for", h.service)
+		go r.reprobe(h)
+
+		for i, m := range r.managed {
+			if h == m {
+				r.managed = append(r.managed[:i], r.managed[i+1:]...)
+				break
+			}
+		}
+	}
+
+	r.handleQuery(req, services(r.managed))
 }
 
 func (r *responder) unannounce(services []*Service) {
