@@ -180,12 +180,16 @@ func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
 }
 
 func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
-	var isReading = true
+
+	isDone := func(ctx context.Context) bool {
+		return ctx.Err() == context.Canceled
+	}
+
 	if c.ipv4 != nil {
 		go func() {
 			buf := make([]byte, 65536)
 			for {
-				if !isReading {
+				if isDone(ctx) {
 					return
 				}
 
@@ -222,7 +226,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 		go func() {
 			buf := make([]byte, 65536)
 			for {
-				if !isReading {
+				if isDone(ctx) {
 					return
 				}
 
@@ -254,11 +258,6 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 			}
 		}()
 	}
-
-	go func() {
-		<-ctx.Done()
-		isReading = false
-	}()
 }
 
 func (c *mdnsConn) sendQuery(m *dns.Msg, iface *net.Interface) error {
