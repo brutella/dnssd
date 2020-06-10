@@ -220,7 +220,9 @@ func (r *responder) respond(ctx context.Context) error {
 	for {
 		select {
 		case req := <-ch:
+			r.mutex.Lock()
 			if len(r.managed) == 0 {
+				r.mutex.Unlock()
 				// Ignore requests when no services are managed
 				break
 			}
@@ -228,6 +230,7 @@ func (r *responder) respond(ctx context.Context) error {
 			// If messages is truncated, we wait for the next message to come (RFC6762 18.5)
 			if req.msg.Truncated {
 				r.truncated = req
+				r.mutex.Unlock()
 				log.Debug.Println("Waiting for additional answers...")
 				break
 			}
@@ -242,10 +245,11 @@ func (r *responder) respond(ctx context.Context) error {
 
 			// Conflicting records remove managed services from
 			// the responder and trigger reprobing
-			conflicts := r.findConflicts(req, r.managed)
+			conflicts := findConflicts(req, r.managed)
 			for _, h := range conflicts {
 				log.Debug.Println("Reprobe for", h.service)
 				go r.reprobe(h)
+
 				for i, m := range r.managed {
 					if h == m {
 						r.managed = append(r.managed[:i], r.managed[i+1:]...)
@@ -255,6 +259,7 @@ func (r *responder) respond(ctx context.Context) error {
 			}
 
 			r.handleQuery(req, services(r.managed))
+			r.mutex.Unlock()
 
 		case <-ctx.Done():
 			r.unannounce(services(r.managed))
@@ -329,18 +334,6 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 	}
 }
 
-func (r *responder) findConflicts(req *Request, hs []*serviceHandle) []*serviceHandle {
-	var conflicts []*serviceHandle
-	for _, h := range hs {
-		if containsConflictingAnswers(req, h) {
-			log.Debug.Println("Received conflicting record", req.msg)
-			conflicts = append(conflicts, h)
-		}
-	}
-
-	return conflicts
-}
-
 func (r *responder) reprobe(h *serviceHandle) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -349,11 +342,15 @@ func (r *responder) reprobe(h *serviceHandle) {
 	if err != nil {
 		return
 	}
-
 	h.service = &probed
-	r.managed = append(r.managed, h)
-	log.Debug.Println("Reannouncing services", r.managed)
-	go r.announce(services(r.managed))
+
+	r.mutex.Lock()
+	managed := append(r.managed, h)
+	r.managed = managed
+	r.mutex.Unlock()
+
+	log.Debug.Println("Reannouncing services", managed)
+	go r.announce(services(managed))
 }
 
 func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *dns.Msg {
@@ -442,6 +439,18 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 	resp.Authoritative = true
 
 	return resp
+}
+
+func findConflicts(req *Request, hs []*serviceHandle) []*serviceHandle {
+	var conflicts []*serviceHandle
+	for _, h := range hs {
+		if containsConflictingAnswers(req, h) {
+			log.Debug.Println("Received conflicting record", req.msg)
+			conflicts = append(conflicts, h)
+		}
+	}
+
+	return conflicts
 }
 
 func services(hs []*serviceHandle) []*Service {
