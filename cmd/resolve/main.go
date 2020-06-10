@@ -13,7 +13,7 @@ import (
 )
 
 var instanceFlag = flag.String("Name", "Service", "Service Name")
-var serviceFlag = flag.String("Type", "_hap._tcp", "Service type")
+var serviceFlag = flag.String("Type", "_asdf._tcp", "Service type")
 var domainFlag = flag.String("Domain", "local", "Browsing domain")
 
 var timeFormat = "15:04:05.000"
