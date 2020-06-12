@@ -22,6 +22,9 @@ func ProbeService(ctx context.Context, srv Service) (Service, error) {
 
 	defer conn.close()
 
+	// we don't want to receive our own probing packets
+	conn.enableMulticastLoopback(false)
+
 	// After one minute of probing, if the Multicast DNS responder has been
 	// unable to find any unused name, it should log an error (RFC6762 9)
 	probeCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -40,6 +43,9 @@ func ProbeService(ctx context.Context, srv Service) (Service, error) {
 
 func ReprobeService(ctx context.Context, srv Service) (Service, error) {
 	conn, err := newMDNSConn()
+
+	// we don't want to receive our own probing packets
+	conn.enableMulticastLoopback(false)
 
 	if err != nil {
 		return srv, err
