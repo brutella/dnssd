@@ -305,9 +305,11 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 	var err error
 	if c.ipv4 != nil && addr.IP.To4() != nil {
 		if out, err := m.Pack(); err == nil {
-			ctrl := &ipv4.ControlMessage{}
+			var ctrl *ipv4.ControlMessage
 			if iface != nil {
-				ctrl.IfIndex = iface.Index
+				ctrl = &ipv4.ControlMessage{
+					IfIndex: iface.Index,
+				}
 			}
 			_, err = c.ipv4.WriteTo(out, ctrl, addr)
 		}
@@ -315,9 +317,11 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 
 	if c.ipv6 != nil && addr.IP.To4() == nil {
 		if out, err := m.Pack(); err == nil {
-			ctrl := &ipv6.ControlMessage{}
+			var ctrl *ipv6.ControlMessage
 			if iface != nil {
-				ctrl.IfIndex = iface.Index
+				ctrl = &ipv6.ControlMessage{
+					IfIndex: iface.Index,
+				}
 			}
 			_, err = c.ipv6.WriteTo(out, ctrl, addr)
 		}
