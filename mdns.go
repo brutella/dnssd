@@ -124,6 +124,7 @@ func newMDNSConn() (*mdnsConn, error) {
 	} else {
 		connIPv4 = ipv4.NewPacketConn(conn)
 		connIPv4.SetControlMessage(ipv4.FlagInterface, true)
+		connIPv4.SetMulticastLoopback(false)
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv4.JoinGroup(&iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
@@ -139,6 +140,7 @@ func newMDNSConn() (*mdnsConn, error) {
 	} else {
 		connIPv6 = ipv6.NewPacketConn(conn)
 		connIPv6.SetControlMessage(ipv6.FlagInterface, true)
+		connIPv6.SetMulticastLoopback(false)
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv6.JoinGroup(&iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
