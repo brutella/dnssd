@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"context"
+	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 )
 
@@ -34,13 +35,22 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 
 	ch := conn.Read(readCtx)
 
-	q := &Query{msg: m}
-	conn.SendQuery(q)
+	qs := make(chan *Query)
+	go func() {
+		for _, iface := range multicastInterfaces() {
+			q := &Query{msg: m, iface: &iface}
+			qs <- q
+		}
+	}()
 
 	for {
 		select {
+		case q := <-qs:
+			if err := conn.SendQuery(q); err != nil {
+				log.Info.Println(err)
+			}
 		case req := <-ch:
-			cache.UpdateFrom(req.msg)
+			cache.UpdateFrom(req.msg, req.iface)
 			if s, ok := cache.services[instance]; ok && s.IPs != nil && len(s.IPs) > 0 {
 				srv = *s
 				return
