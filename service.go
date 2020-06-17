@@ -239,28 +239,34 @@ func parseHostname(str string) (name string, domain string) {
 	return
 }
 
+// multicastInterfaces returns a list of all available multicast network interfaces.
 func multicastInterfaces() []net.Interface {
-	var interfaces []net.Interface
+	var tmp []net.Interface
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
 	}
 
-	for _, ifi := range ifaces {
-		if (ifi.Flags & net.FlagUp) == 0 {
+	for _, iface := range ifaces {
+		if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagMulticast) == 0 {
 			continue
 		}
 
-		if (ifi.Flags & net.FlagLoopback) > 0 {
+		// check for a valid ip at that interface
+		addrs, err := iface.Addrs()
+		if err != nil {
 			continue
 		}
 
-		if (ifi.Flags & net.FlagMulticast) > 0 {
-			interfaces = append(interfaces, ifi)
+		for _, addr := range addrs {
+			if _, _, err := net.ParseCIDR(addr.String()); err == nil {
+				tmp = append(tmp, iface)
+				break
+			}
 		}
 	}
 
-	return interfaces
+	return tmp
 }
 
 // addrsForInterface returns ipv4 and ipv6 addresses for a specific interface.
