@@ -172,12 +172,10 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 			for _, answer := range answers {
 				switch rr := answer.(type) {
 				case *dns.A:
-					for _, a := range as {
-						if isDenyingA(rr, a) {
-							log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
-							conflict.hostname = true
-							break
-						}
+					if !containedInAs(rr, as) {
+						log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
+						conflict.hostname = true
+						break
 					}
 
 				case *dns.AAAA:
