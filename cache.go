@@ -157,11 +157,34 @@ func (a byType) Less(i, j int) bool {
 	return false
 }
 
-func allRecords(m *dns.Msg) []dns.RR {
-	var answ []dns.RR
-	answ = append(answ, m.Answer...)
-	answ = append(answ, m.Ns...)
-	answ = append(answ, m.Extra...)
+func filterRecords(m *dns.Msg, service *Service) []dns.RR {
+	var all []dns.RR
+	all = append(all, m.Answer...)
+	all = append(all, m.Ns...)
+	all = append(all, m.Extra...)
 
-	return answ
+	if service == nil {
+		return all
+	}
+
+	var answers []dns.RR
+	for _, answer := range all {
+		switch rr := answer.(type) {
+		case *dns.SRV:
+			if rr.Hdr.Name != service.ServiceInstanceName() {
+				continue
+			}
+		case *dns.A:
+			if service.Hostname() != rr.Hdr.Name {
+				continue
+			}
+		case *dns.AAAA:
+			if service.Hostname() != rr.Hdr.Name {
+				continue
+			}
+		}
+		answers = append(answers, answer)
+	}
+
+	return answers
 }

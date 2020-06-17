@@ -116,58 +116,38 @@ func (r *responder) Respond(ctx context.Context) error {
 
 // announce sends announcement messages including all services.
 func (r *responder) announce(services []*Service) {
-	names := ifaceNames(services)
-
-	if len(names) == 0 {
-		r.announceAtInterface(services, nil)
-		return
-	}
-
-	for _, name := range names {
-		if iface, err := net.InterfaceByName(name); err != nil {
-			log.Debug.Println("Unable to find interface", name)
-		} else {
-			r.announceAtInterface(services, iface)
+	for _, service := range services {
+		for _, iface := range service.Interfaces() {
+			go r.announceAtInterface(service, iface)
 		}
 	}
 }
 
-func (r *responder) announceAtInterface(services []*Service, iface *net.Interface) {
-	var msgs []*dns.Msg
-	for _, srv := range services {
-		var ips []net.IP
-		if iface != nil {
-			ips = srv.IPsAtInterface(iface)
-		} else {
-			ips = srv.IPs
-		}
-		if len(ips) == 0 {
-			log.Debug.Println("No IPs for service", srv.ServiceInstanceName())
-			continue
-		}
-
-		var answer []dns.RR
-		answer = append(answer, SRV(*srv))
-		answer = append(answer, PTR(*srv))
-		answer = append(answer, TXT(*srv))
-		for _, a := range A(*srv, iface) {
-			answer = append(answer, a)
-		}
-
-		for _, aaaa := range AAAA(*srv, iface) {
-			answer = append(answer, aaaa)
-		}
-		msg := new(dns.Msg)
-		msg.Answer = answer
-		msgs = append(msgs, msg)
+func (r *responder) announceAtInterface(service *Service, iface net.Interface) {
+	ips := service.IPsAtInterface(iface)
+	if len(ips) == 0 {
+		log.Debug.Printf("No IPs for service %s at %s\n", service.ServiceInstanceName(), iface.Name)
+		return
 	}
-	msg := mergeMsgs(msgs)
+
+	var answer []dns.RR
+	answer = append(answer, SRV(*service))
+	answer = append(answer, PTR(*service))
+	answer = append(answer, TXT(*service))
+	for _, a := range A(*service, iface) {
+		answer = append(answer, a)
+	}
+	for _, aaaa := range AAAA(*service, iface) {
+		answer = append(answer, aaaa)
+	}
+	msg := new(dns.Msg)
+	msg.Answer = answer
 	msg.Response = true
 	msg.Authoritative = true
 
 	setAnswerCacheFlushBit(msg)
 
-	resp := &Response{msg: msg, iface: iface}
+	resp := &Response{msg: msg, iface: &iface}
 
 	log.Debug.Println("Sending 1st announcement", msg)
 	r.conn.SendResponse(resp)
@@ -279,26 +259,41 @@ func (r *responder) unannounce(services []*Service) {
 
 	log.Debug.Println("Send goodbye for", services)
 
-	// Send goodbye packets
-	var answer []dns.RR
+	// collect records per interface
+	rrsByIfaceName := map[string][]dns.RR{}
 	for _, srv := range services {
-		answer = append(answer, PTR(*srv))
+		rr := PTR(*srv)
+		rr.Header().Ttl = 0
+		for _, iface := range srv.Interfaces() {
+			ips := srv.IPsAtInterface(iface)
+			if len(ips) == 0 {
+				continue
+			}
+			if rrs, ok := rrsByIfaceName[iface.Name]; ok {
+				rrsByIfaceName[iface.Name] = append(rrs, rr)
+			} else {
+				rrsByIfaceName[iface.Name] = []dns.RR{rr}
+			}
+		}
 	}
 
-	for _, a := range answer {
-		a.Header().Ttl = 0
+	// send on goodbye packet on every interface
+	for name, rrs := range rrsByIfaceName {
+		iface, err := net.InterfaceByName(name)
+		if err != nil {
+			log.Debug.Printf("Interface %s not found\n", name)
+			continue
+		}
+		msg := new(dns.Msg)
+		msg.Answer = rrs
+		msg.Response = true
+		msg.Authoritative = true
+
+		resp := &Response{msg: msg, iface: iface}
+		r.conn.SendResponse(resp)
+		time.Sleep(250 * time.Millisecond)
+		r.conn.SendResponse(resp)
 	}
-
-	goodbye := new(dns.Msg)
-	goodbye.Answer = answer
-	goodbye.Response = true
-	goodbye.Authoritative = true
-
-	resp := &Response{msg: goodbye}
-
-	r.conn.SendResponse(resp)
-	time.Sleep(250 * time.Millisecond)
-	r.conn.SendResponse(resp)
 }
 
 func (r *responder) handleQuery(req *Request, services []*Service) {
@@ -365,15 +360,15 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		extra := []dns.RR{SRV(srv), TXT(srv)}
 
-		for _, a := range A(srv, req.iface) {
+		for _, a := range A(srv, *req.iface) {
 			extra = append(extra, a)
 		}
 
-		for _, aaaa := range AAAA(srv, req.iface) {
+		for _, aaaa := range AAAA(srv, *req.iface) {
 			extra = append(extra, aaaa)
 		}
 
-		extra = append(extra, NSEC(ptr, srv, req.iface))
+		extra = append(extra, NSEC(ptr, srv, *req.iface))
 		resp.Extra = extra
 
 		// Wait 20-125 msec for shared resource responses
@@ -386,15 +381,15 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		var extra []dns.RR
 
-		for _, a := range A(srv, req.iface) {
+		for _, a := range A(srv, *req.iface) {
 			extra = append(extra, a)
 		}
 
-		for _, aaaa := range AAAA(srv, req.iface) {
+		for _, aaaa := range AAAA(srv, *req.iface) {
 			extra = append(extra, aaaa)
 		}
 
-		nsec := NSEC(SRV(srv), srv, req.iface)
+		nsec := NSEC(SRV(srv), srv, *req.iface)
 		if nsec != nil {
 			extra = append(extra, nsec)
 		}
@@ -407,16 +402,16 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 	case strings.ToLower(srv.Hostname()):
 		var answer []dns.RR
 
-		for _, a := range A(srv, req.iface) {
+		for _, a := range A(srv, *req.iface) {
 			answer = append(answer, a)
 		}
 
-		for _, aaaa := range AAAA(srv, req.iface) {
+		for _, aaaa := range AAAA(srv, *req.iface) {
 			answer = append(answer, aaaa)
 		}
 
 		resp.Answer = answer
-		nsec := NSEC(SRV(srv), srv, req.iface)
+		nsec := NSEC(SRV(srv), srv, *req.iface)
 
 		if nsec != nil {
 			resp.Extra = []dns.RR{nsec}
@@ -464,38 +459,31 @@ func services(hs []*serviceHandle) []*Service {
 	return result
 }
 
-func ifaceNames(svs []*Service) []string {
-	var names []string
-	for _, sv := range svs {
-		for name := range sv.IfaceIPs {
-			names = append(names, name)
-		}
-	}
-
-	return names
-}
-
 func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
-	answers := allRecords(req.msg)
+	answers := filterRecords(req.msg, handle.service)
 
-	as := A(*handle.service, req.iface)
-	aaaas := AAAA(*handle.service, req.iface)
+	as := A(*handle.service, *req.iface)
+	aaaas := AAAA(*handle.service, *req.iface)
 	srv := SRV(*handle.service)
 
 	for _, answer := range answers {
 		switch rr := answer.(type) {
 		case *dns.A:
-			for _, a := range as {
-				if isDenyingA(rr, a) {
-					return true
-				}
+			if !strings.EqualFold(rr.Hdr.Name, handle.Service().Hostname()) {
+				continue // record is for a different host; ignore
+			}
+			if !containedInAs(rr, as) {
+				log.Debug.Printf("%v not found in %v", rr, as)
+				return true // ipv4 address is not known; conflict
 			}
 
 		case *dns.AAAA:
-			for _, aaaa := range aaaas {
-				if isDenyingAAAA(rr, aaaa) {
-					return true
-				}
+			if !strings.EqualFold(rr.Hdr.Name, handle.Service().Hostname()) {
+				continue // record is for a different host; ignore
+			}
+			if !containedInAAAAs(rr, aaaas) {
+				log.Debug.Printf("%v not found in %v", rr, aaaas)
+				return true // ipv6 address is not known; conflict
 			}
 
 		case *dns.SRV:
