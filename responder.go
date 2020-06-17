@@ -321,12 +321,16 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 
 		if isUnicastQuestion(q) {
 			resp := &Response{msg: msg, addr: req.from, iface: req.iface}
-			log.Debug.Printf("Send unicast response\n%v\n", msg)
-			r.conn.SendResponse(resp)
+			log.Debug.Printf("Send unicast response\n%v to %v\n", msg, resp.addr)
+			if err := r.conn.SendResponse(resp); err != nil {
+				log.Debug.Println(err)
+			}
 		} else {
 			resp := &Response{msg: msg, iface: req.iface}
 			log.Debug.Printf("Send multicast response\n%v\n", msg)
-			r.conn.SendResponse(resp)
+			if err := r.conn.SendResponse(resp); err != nil {
+				log.Debug.Println(err)
+			}
 		}
 	}
 }
