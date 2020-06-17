@@ -93,7 +93,7 @@ func TestNewServiceWithMinimalConfig(t *testing.T) {
 		t.Fatalf("%v != %v", is, want)
 	}
 
-	if len(sv.IfaceIPs) == 0 {
+	if len(sv.ifaceIPs) == 0 {
 		t.Fatal("Expected interface ips")
 	}
 }

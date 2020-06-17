@@ -1,6 +1,8 @@
 package dnssd
 
 import (
+	"github.com/brutella/dnssd/log"
+
 	"fmt"
 	"net"
 	"os"
@@ -27,41 +29,43 @@ type Config struct {
 	Text map[string]string
 
 	// IP addresses of the service.
-	// If specified, probing for uniqueness of the service instance name
-	// and host names is skipped and the service is announced as is.
+	// This field is deprecated and should not be used.
 	IPs []net.IP
 
 	// Port is the port of the service.
 	Port int
 
-	ifaceIPs map[string][]net.IP
+	// Interfaces at which the service should be registered
+	Ifaces []string
 }
 
 func (c Config) Copy() Config {
 	return Config{
-		Name:     c.Name,
-		Type:     c.Type,
-		Domain:   c.Domain,
-		Host:     c.Host,
-		Text:     c.Text,
-		IPs:      c.IPs,
-		Port:     c.Port,
-		ifaceIPs: c.ifaceIPs,
+		Name:   c.Name,
+		Type:   c.Type,
+		Domain: c.Domain,
+		Host:   c.Host,
+		Text:   c.Text,
+		IPs:    c.IPs,
+		Port:   c.Port,
+		Ifaces: c.Ifaces,
 	}
 }
 
 // Service represents a DNS-SD service instance
 type Service struct {
-	Name     string
-	Type     string
-	Domain   string
-	Host     string
-	Text     map[string]string
-	TTL      time.Duration // Original time to live
-	Port     int
-	IPs      []net.IP
-	IfaceIPs map[string][]net.IP
+	Name   string
+	Type   string
+	Domain string
+	Host   string
+	Text   map[string]string
+	TTL    time.Duration // Original time to live
+	Port   int
+	IPs    []net.IP
+	Ifaces []string
 
+	// stores ips by interface name for caching purposes
+	ifaceIPs   map[string][]net.IP
 	expiration time.Time
 }
 
@@ -101,48 +105,66 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	ips := []net.IP{}
-	ifaceIPs := map[string][]net.IP{}
+	var Ifaces []string
 
 	if cfg.IPs != nil && len(cfg.IPs) > 0 {
 		ips = cfg.IPs
 	}
 
-	if cfg.ifaceIPs != nil && len(cfg.ifaceIPs) > 0 {
-		ifaceIPs = cfg.ifaceIPs
-	}
-
-	if len(ips) == 0 && len(ifaceIPs) == 0 {
-		for _, iface := range multicastInterfaces() {
-			ipv4, ipv6 := addrsForInterface(&iface)
-			ifiIPs := append(ipv4, ipv6...)
-			if len(ips) > 0 {
-				ifiIPs = intersection(ips, ifiIPs)
-			}
-			if len(ifiIPs) > 0 {
-				ifaceIPs[iface.Name] = ifiIPs
-			}
-		}
+	if cfg.Ifaces != nil && len(cfg.Ifaces) > 0 {
+		Ifaces = cfg.Ifaces
 	}
 
 	return Service{
-		Name:     name,
-		Type:     typ,
-		Domain:   domain,
-		Host:     host,
-		Text:     text,
-		Port:     port,
-		IPs:      ips,
-		IfaceIPs: ifaceIPs,
+		Name:   name,
+		Type:   typ,
+		Domain: domain,
+		Host:   host,
+		Text:   text,
+		Port:   port,
+		IPs:    ips,
+		Ifaces: Ifaces,
 	}, nil
 }
 
-// IPsAtInterface returns the ip address at a specific interface.
-func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
-	if ips := s.IfaceIPs[iface.Name]; ips != nil {
-		return ips
+// Interfaces returns the network interfaces for which the service is registered,
+// or all multicast network interfaces, if no IP addresses are specified.
+func (s *Service) Interfaces() []net.Interface {
+	if len(s.Ifaces) > 0 {
+		ifis := []net.Interface{}
+		for _, name := range s.Ifaces {
+			if ifi, err := net.InterfaceByName(name); err == nil {
+				ifis = append(ifis, *ifi)
+			}
+		}
+
+		return ifis
 	}
 
-	return []net.IP{}
+	return multicastInterfaces()
+}
+
+// IPsAtInterface returns the ip address at a specific interface.
+func (s *Service) IPsAtInterface(iface net.Interface) []net.IP {
+	if len(s.IPs) > 0 {
+		return s.IPs
+	}
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return []net.IP{}
+	}
+
+	ips := []net.IP{}
+	for _, addr := range addrs {
+		if ip, _, err := net.ParseCIDR(addr.String()); err == nil {
+			ips = append(ips, ip)
+		} else {
+			log.Debug.Println(err)
+		}
+	}
+
+	return ips
 }
 
 func (s Service) Copy() *Service {
@@ -155,7 +177,7 @@ func (s Service) Copy() *Service {
 		TTL:        s.TTL,
 		IPs:        s.IPs,
 		Port:       s.Port,
-		IfaceIPs:   s.IfaceIPs,
+		Ifaces:     s.Ifaces,
 		expiration: s.expiration,
 	}
 }
@@ -183,12 +205,27 @@ func (s Service) ServicesMetaQueryName() string {
 	return fmt.Sprintf("_services._dns-sd._udp.%s.", s.Domain)
 }
 
+func (s *Service) addIP(ip net.IP, iface *net.Interface) {
+	s.IPs = append(s.IPs, ip)
+	if iface != nil {
+		ifaceIPs := []net.IP{ip}
+		if ips, ok := s.ifaceIPs[iface.Name]; ok {
+			ifaceIPs = append(ips, ip)
+		}
+		s.ifaceIPs[iface.Name] = ifaceIPs
+	}
+}
+
 func newService(instance string) *Service {
 	name, typ, domain := parseServiceInstanceName(instance)
 	return &Service{
-		Name:   name,
-		Type:   typ,
-		Domain: domain,
+		Name:     name,
+		Type:     typ,
+		Domain:   domain,
+		Text:     map[string]string{},
+		IPs:      []net.IP{},
+		Ifaces:   []string{},
+		ifaceIPs: map[string][]net.IP{},
 	}
 }
 
