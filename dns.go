@@ -70,7 +70,7 @@ func TXT(srv Service) *dns.TXT {
 	}
 }
 
-func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
+func NSEC(rr dns.RR, srv Service, iface net.Interface) *dns.NSEC {
 	switch r := rr.(type) {
 	case *dns.PTR:
 		return &dns.NSEC{
@@ -85,12 +85,7 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 		}
 	case *dns.SRV:
 		types := []uint16{}
-		var ips []net.IP
-		if iface != nil {
-			ips = srv.IPsAtInterface(iface)
-		} else {
-			ips = srv.IPs
-		}
+		ips := srv.IPsAtInterface(iface)
 		if includesIPv4(ips) {
 			types = append(types, dns.TypeA)
 		}
@@ -117,13 +112,8 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	return nil
 }
 
-func A(srv Service, iface *net.Interface) []*dns.A {
-	var ips []net.IP
-	if iface != nil {
-		ips = srv.IPsAtInterface(iface)
-	} else {
-		ips = srv.IPs
-	}
+func A(srv Service, iface net.Interface) []*dns.A {
+	ips := srv.IPsAtInterface(iface)
 
 	var as []*dns.A
 	for _, ip := range ips {
@@ -144,13 +134,8 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 	return as
 }
 
-func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
-	var ips []net.IP
-	if iface != nil {
-		ips = srv.IPsAtInterface(iface)
-	} else {
-		ips = srv.IPs
-	}
+func AAAA(srv Service, iface net.Interface) []*dns.AAAA {
+	ips := srv.IPsAtInterface(iface)
 
 	var aaaas []*dns.AAAA
 	for _, ip := range ips {
