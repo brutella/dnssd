@@ -130,9 +130,9 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 		Qclass: dns.ClassINET,
 	}
 
-	// Responses to probe should be unicast
-	setQuestionUnicast(&instanceQ)
-	setQuestionUnicast(&hostQ)
+	// TODO Responses to probe should be unicast
+	// setQuestionUnicast(&instanceQ)
+	//     setQuestionUnicast(&hostQ)
 
 	msg.Question = []dns.Question{instanceQ, hostQ}
 
