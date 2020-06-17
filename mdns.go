@@ -302,7 +302,6 @@ func (c *mdnsConn) writeMsg(m *dns.Msg, iface *net.Interface) error {
 func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAddr) error {
 	sanitizeMsg(m)
 
-	var err error
 	if c.ipv4 != nil && addr.IP.To4() != nil {
 		if out, err := m.Pack(); err == nil {
 			var ctrl *ipv4.ControlMessage
@@ -311,7 +310,9 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
-			_, err = c.ipv4.WriteTo(out, ctrl, addr)
+			if _, err = c.ipv4.WriteTo(out, ctrl, addr); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -323,11 +324,13 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
-			_, err = c.ipv6.WriteTo(out, ctrl, addr)
+			if _, err = c.ipv6.WriteTo(out, ctrl, addr); err != nil {
+				return err
+			}
 		}
 	}
 
-	return err
+	return nil
 }
 
 func shouldIgnore(m *dns.Msg) bool {
