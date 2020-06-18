@@ -164,7 +164,7 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 		select {
 		case req := <-ch:
 			if req.iface.Name != iface.Name {
-				log.Info.Println("Ignore msg from", req.iface.Name)
+				log.Debug.Println("Ignore msg from", req.iface.Name)
 				break
 			}
 
