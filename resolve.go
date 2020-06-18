@@ -51,7 +51,7 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 			}
 		case req := <-ch:
 			cache.UpdateFrom(req.msg, req.iface)
-			if s, ok := cache.services[instance]; ok && s.IPs != nil && len(s.IPs) > 0 {
+			if s, ok := cache.services[instance]; ok {
 				srv = *s
 				return
 			}
