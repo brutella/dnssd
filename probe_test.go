@@ -90,7 +90,6 @@ func TestProbing(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	conn := newTestConn()
 	otherConn := newTestConn()
@@ -98,56 +97,63 @@ func TestProbing(t *testing.T) {
 	conn.out = otherConn.in
 
 	cfg := Config{
-		Name: "My Service",
-		Type: "_hap._tcp",
-		Host: "My-Computer",
-		Port: 12334,
-		ifaceIPs: map[string][]net.IP{
-			testIface.Name: []net.IP{net.ParseIP("192.168.0.122")},
-		},
+		Name:   "My Service",
+		Type:   "_hap._tcp",
+		Host:   "My-Computer",
+		Port:   12334,
+		Ifaces: []string{testIface.Name},
 	}
 	srv, err := NewService(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.ifaceIPs = map[string][]net.IP{
+		testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
+	}
 
-	go func() {
-		otherCfg := cfg.Copy()
-		otherCfg.IPs = []net.IP{net.ParseIP("192.168.0.123")}
-		otherCfg.ifaceIPs = nil
-		otherSrv, otherErr := NewService(otherCfg)
-		if otherErr != nil {
-			t.Fatal(otherErr)
+	t.Run("responder", func(t *testing.T) {
+		t.Parallel()
+		rcfg := cfg.Copy()
+		rsrv, err := NewService(rcfg)
+		if err != nil {
+			t.Fatal(err)
 		}
-		otherResp := newResponder(otherConn)
-		otherResp.Add(otherSrv)
+		rsrv.ifaceIPs = map[string][]net.IP{
+			testIface.Name: []net.IP{net.IP{192, 168, 0, 123}},
+		}
 
-		otherCtx, otherCancel := context.WithCancel(ctx)
-		defer otherCancel()
+		rctx, rcancel := context.WithCancel(ctx)
+		defer rcancel()
 
-		// the responder won't probe for the service instance name and host name
-		// because we explicitely set the IP address.
-		otherResp.Respond(otherCtx)
-	}()
+		r := newResponder(otherConn)
+		r.addManaged(rsrv)
+		r.Respond(rctx)
+	})
 
 	// Wait until second service was announced.
 	// This doesn't take long because we set the IP address
 	// explicitely. Therefore no probing is done.
 	<-time.After(500 * time.Millisecond)
 
-	resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
+	t.Run("prober", func(t *testing.T) {
+		t.Parallel()
 
-	if x := err; x != nil {
-		t.Fatal(x)
-	}
+		resolved, err := probeService(ctx, conn, srv, 1*time.Second, false)
 
-	if is, want := resolved.Host, "My-Computer-2"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
+		if x := err; x != nil {
+			t.Fatal(x)
+		}
 
-	if is, want := resolved.Name, "My Service-2"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
+		if is, want := resolved.Host, "My-Computer-2"; is != want {
+			t.Fatalf("is=%v want=%v", is, want)
+		}
+
+		if is, want := resolved.Name, "My Service-2"; is != want {
+			t.Fatalf("is=%v want=%v", is, want)
+		}
+
+		cancel()
+	})
 }
 
 func TestIsLexicographicLater(t *testing.T) {

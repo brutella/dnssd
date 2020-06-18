@@ -37,20 +37,19 @@ func TestRemove(t *testing.T) {
 
 func TestRegisterServiceWithExplicitIP(t *testing.T) {
 	cfg := Config{
-		Host:   "My Computer",
+		Host:   "Computer",
 		Name:   "Test",
 		Type:   "_asdf._tcp",
 		Domain: "local",
-		IPs:    []net.IP{net.ParseIP("192.168.0.123")},
 		Port:   12345,
+		Ifaces: []string{"lo0"},
 	}
 	sv, err := NewService(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if is, want := len(sv.IPs), 1; is != want {
-		t.Fatalf("%v != %v", is, want)
+	sv.ifaceIPs = map[string][]net.IP{
+		"lo0": []net.IP{net.IP{192, 168, 0, 123}},
 	}
 
 	conn := newTestConn()
@@ -59,10 +58,10 @@ func TestRegisterServiceWithExplicitIP(t *testing.T) {
 	conn.out = otherConn.in
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-time.After(10 * time.Millisecond)
+	t.Run("resolver", func(t *testing.T) {
+		t.Parallel()
 
-		lookupCtx, lookupCancel := context.WithTimeout(ctx, 2*time.Second)
+		lookupCtx, lookupCancel := context.WithTimeout(ctx, 5*time.Second)
 
 		defer lookupCancel()
 		defer cancel()
@@ -79,9 +78,26 @@ func TestRegisterServiceWithExplicitIP(t *testing.T) {
 		if is, want := srv.Type, "_asdf._tcp"; is != want {
 			t.Fatalf("%v != %v", is, want)
 		}
-	}()
 
-	r := newResponder(conn)
-	r.Add(sv)
-	r.Respond(ctx)
+		if is, want := srv.Host, "Computer"; is != want {
+			t.Fatalf("%v != %v", is, want)
+		}
+
+		ips := srv.IPsAtInterface(net.Interface{Name: "lo0"})
+		if is, want := len(ips), 1; is != want {
+			t.Fatalf("%v != %v", is, want)
+		}
+
+		if is, want := ips[0].String(), "192.168.0.123"; is != want {
+			t.Fatalf("%v != %v", is, want)
+		}
+	})
+
+	t.Run("responder", func(t *testing.T) {
+		t.Parallel()
+
+		r := newResponder(conn)
+		r.addManaged(sv) // don't probe
+		r.Respond(ctx)
+	})
 }
