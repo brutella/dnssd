@@ -132,7 +132,7 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 
 	// TODO Responses to probe should be unicast
 	// setQuestionUnicast(&instanceQ)
-	//     setQuestionUnicast(&hostQ)
+	// setQuestionUnicast(&hostQ)
 
 	msg.Question = []dns.Question{instanceQ, hostQ}
 
@@ -164,32 +164,26 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 		select {
 		case req := <-ch:
 			if req.iface.Name != iface.Name {
-				log.Info.Println("Ingore message from different interface", req.iface.Name)
+				log.Info.Println("Ignore msg from", req.iface.Name)
 				break
 			}
 
 			answers := filterRecords(req.msg, &service)
-			for _, answer := range answers {
-				switch rr := answer.(type) {
-				case *dns.A:
-					if !containedInAs(rr, as) {
-						log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
-						conflict.hostname = true
-					}
+			reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
 
-				case *dns.AAAA:
-					if !containedInAAAAs(rr, aaaas) {
-						log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.iface.Name)
-						conflict.hostname = true
-					}
+			if len(reqAs) > 0 && !equalAs(reqAs, as) {
+				log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
+				log.Debug.Printf("%v != %v\n", reqAs, as)
+				conflict.hostname = true
+			} else if len(reqAAAAs) > 0 && !equalAAAAs(reqAAAAs, aaaas) {
+				log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.iface.Name)
+				log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
+				conflict.hostname = true
+			}
 
-				case *dns.SRV:
-					if isDenyingSRV(rr, srv) {
-						conflict.serviceName = true
-					}
-
-				default:
-					break
+			for _, reqSRV := range reqSRVs {
+				if isDenyingSRV(reqSRV, srv) {
+					conflict.serviceName = true
 				}
 			}
 
@@ -283,6 +277,44 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 	}
 
 	return false
+}
+
+func equalAs(this []*dns.A, that []*dns.A) bool {
+	var tmp = that
+	for _, ti := range this {
+		var found = false
+		for i, ta := range tmp {
+			if compareIP(ti.A.To4(), ta.A.To4()) == 0 {
+				tmp = append(tmp[:i], tmp[i+1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return len(tmp) == 0
+}
+
+func equalAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
+	var tmp = that
+	for _, ti := range this {
+		var found = false
+		for i, ta := range tmp {
+			if compareIP(ti.AAAA.To16(), ta.AAAA.To16()) == 0 {
+				tmp = append(tmp[:i], tmp[i+1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return len(tmp) == 0
 }
 
 func containedInAs(this *dns.A, aaas []*dns.A) bool {

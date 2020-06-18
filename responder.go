@@ -464,39 +464,24 @@ func services(hs []*serviceHandle) []*Service {
 }
 
 func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
-	answers := filterRecords(req.msg, handle.service)
-
 	as := A(*handle.service, *req.iface)
 	aaaas := AAAA(*handle.service, *req.iface)
 	srv := SRV(*handle.service)
 
-	for _, answer := range answers {
-		switch rr := answer.(type) {
-		case *dns.A:
-			if !strings.EqualFold(rr.Hdr.Name, handle.Service().Hostname()) {
-				continue // record is for a different host; ignore
-			}
-			if !containedInAs(rr, as) {
-				log.Debug.Printf("%v not found in %v", rr, as)
-				return true // ipv4 address is not known; conflict
-			}
+	answers := filterRecords(req.msg, handle.service)
+	reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
 
-		case *dns.AAAA:
-			if !strings.EqualFold(rr.Hdr.Name, handle.Service().Hostname()) {
-				continue // record is for a different host; ignore
-			}
-			if !containedInAAAAs(rr, aaaas) {
-				log.Debug.Printf("%v not found in %v", rr, aaaas)
-				return true // ipv6 address is not known; conflict
-			}
+	if len(reqAs) > 0 && !equalAs(reqAs, as) {
+		log.Debug.Printf("%v != %v\n", reqAs, as)
+		return true
+	} else if len(reqAAAAs) > 0 && !equalAAAAs(reqAAAAs, aaaas) {
+		log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
+		return true
+	}
 
-		case *dns.SRV:
-			if isDenyingSRV(rr, srv) {
-				return true
-			}
-
-		default:
-			break
+	for _, reqSRV := range reqSRVs {
+		if isDenyingSRV(reqSRV, srv) {
+			return true
 		}
 	}
 

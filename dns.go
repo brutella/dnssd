@@ -156,6 +156,20 @@ func AAAA(srv Service, iface net.Interface) []*dns.AAAA {
 	return aaaas
 }
 
+func splitRecords(records []dns.RR) (as []*dns.A, aaaas []*dns.AAAA, srvs []*dns.SRV) {
+	for _, record := range records {
+		switch rr := record.(type) {
+		case *dns.A:
+			as = append(as, rr)
+		case *dns.AAAA:
+			aaaas = append(aaaas, rr)
+		case *dns.SRV:
+			srvs = append(srvs, rr)
+		}
+	}
+	return
+}
+
 // Returns true if ips contains IPv4 addresses.
 func includesIPv4(ips []net.IP) bool {
 	for _, ip := range ips {
