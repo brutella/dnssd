@@ -175,14 +175,12 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 					if !containedInAs(rr, as) {
 						log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
 						conflict.hostname = true
-						break
 					}
 
 				case *dns.AAAA:
 					if !containedInAAAAs(rr, aaaas) {
 						log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.iface.Name)
 						conflict.hostname = true
-						break
 					}
 
 				case *dns.SRV:
@@ -290,8 +288,6 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 func containedInAs(this *dns.A, aaas []*dns.A) bool {
 	for _, that := range aaas {
 		if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
-			log.Debug.Println("Same hosts")
-
 			if !isValidRR(this) {
 				log.Debug.Println("Invalid record produces conflict")
 				return false
@@ -309,7 +305,6 @@ func containedInAs(this *dns.A, aaas []*dns.A) bool {
 func containedInAAAAs(this *dns.AAAA, aaas []*dns.AAAA) bool {
 	for _, that := range aaas {
 		if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
-			log.Debug.Println("Same hosts")
 			if !isValidRR(this) {
 				log.Debug.Println("Invalid record produces conflict")
 				return false
