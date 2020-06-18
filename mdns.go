@@ -162,16 +162,6 @@ func newMDNSConn() (*mdnsConn, error) {
 	}, nil
 }
 
-func (c *mdnsConn) enableMulticastLoopback(enable bool) {
-	if c.ipv4 != nil {
-		c.ipv4.SetMulticastLoopback(enable)
-	}
-
-	if c.ipv6 != nil {
-		c.ipv6.SetMulticastLoopback(enable)
-	}
-}
-
 func (c *mdnsConn) close() {
 	if c.ipv4 != nil {
 		c.ipv4.Close()

@@ -26,8 +26,6 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	if err != nil {
 		return err
 	}
-	// receive message from same host
-	// conn.enableMulticastLoopback(true)
 	defer conn.close()
 
 	return lookupType(ctx, service, conn, add, rmv)
