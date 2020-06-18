@@ -285,7 +285,11 @@ func multicastInterfaces() []net.Interface {
 	}
 
 	for _, iface := range ifaces {
-		if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagMulticast) == 0 {
+		if (iface.Flags & net.FlagUp) == 0 {
+			continue
+		}
+
+		if (iface.Flags & net.FlagMulticast) == 0 {
 			continue
 		}
 
@@ -294,7 +298,6 @@ func multicastInterfaces() []net.Interface {
 		if err != nil {
 			continue
 		}
-
 		for _, addr := range addrs {
 			if _, _, err := net.ParseCIDR(addr.String()); err == nil {
 				tmp = append(tmp, iface)
