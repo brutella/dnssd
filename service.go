@@ -116,14 +116,15 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	return Service{
-		Name:   name,
-		Type:   typ,
-		Domain: domain,
-		Host:   host,
-		Text:   text,
-		Port:   port,
-		IPs:    ips,
-		Ifaces: Ifaces,
+		Name:     name,
+		Type:     typ,
+		Domain:   domain,
+		Host:     host,
+		Text:     text,
+		Port:     port,
+		IPs:      ips,
+		Ifaces:   Ifaces,
+		ifaceIPs: map[string][]net.IP{},
 	}, nil
 }
 
@@ -146,6 +147,10 @@ func (s *Service) Interfaces() []net.Interface {
 
 // IPsAtInterface returns the ip address at a specific interface.
 func (s *Service) IPsAtInterface(iface net.Interface) []net.IP {
+	if ips, ok := s.ifaceIPs[iface.Name]; ok {
+		return ips
+	}
+
 	if len(s.IPs) > 0 {
 		return s.IPs
 	}
@@ -178,6 +183,7 @@ func (s Service) Copy() *Service {
 		IPs:        s.IPs,
 		Port:       s.Port,
 		Ifaces:     s.Ifaces,
+		ifaceIPs:   s.ifaceIPs,
 		expiration: s.expiration,
 	}
 }
