@@ -1,8 +1,10 @@
 package dnssd
 
 import (
-	"context"
+	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
+
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -81,6 +83,7 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
+	log.Debug.Disable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
@@ -89,7 +92,7 @@ func TestProbing(t *testing.T) {
 		t.Fatal("can not find the local interface")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
 	conn := newTestConn()
 	otherConn := newTestConn()
@@ -138,7 +141,7 @@ func TestProbing(t *testing.T) {
 	t.Run("prober", func(t *testing.T) {
 		t.Parallel()
 
-		resolved, err := probeService(ctx, conn, srv, 1*time.Second, false)
+		resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
 
 		if x := err; x != nil {
 			t.Fatal(x)

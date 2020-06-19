@@ -171,11 +171,11 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 			answers := filterRecords(req.msg, &service)
 			reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
 
-			if len(reqAs) > 0 && !equalAs(reqAs, as) {
+			if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 				log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
 				log.Debug.Printf("%v != %v\n", reqAs, as)
 				conflict.hostname = true
-			} else if len(reqAAAAs) > 0 && !equalAAAAs(reqAAAAs, aaaas) {
+			} else if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
 				log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.iface.Name)
 				log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
 				conflict.hostname = true
@@ -277,6 +277,42 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 	}
 
 	return false
+}
+
+func areDenyingAs(this []*dns.A, that []*dns.A) bool {
+	if len(this) != len(that) {
+		// different number of As are a conflict
+		return true
+	}
+
+	if equalAs(this, that) {
+		return false // equal As are no conlict
+	}
+
+	if len(this) == 1 && !isDenyingA(this[0], that[0]) {
+		// this doesn't deny that but the other way around
+		return false
+	}
+
+	return true
+}
+
+func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
+	if len(this) != len(that) {
+		// different number of AAAAs are a conflict
+		return true
+	}
+
+	if equalAAAAs(this, that) {
+		return false // equal AAAAs are no conlict
+	}
+
+	if len(this) == 1 && !isDenyingAAAA(this[0], that[0]) {
+		// this doesn't deny that but the other way around
+		return false
+	}
+
+	return true
 }
 
 func equalAs(this []*dns.A, that []*dns.A) bool {

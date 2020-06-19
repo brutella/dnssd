@@ -101,6 +101,7 @@ func (r *responder) Respond(ctx context.Context) error {
 	r.mutex.Lock()
 	r.isRunning = true
 	for _, h := range r.unmanaged {
+		log.Debug.Println(h.service)
 		if srv, err := r.register(ctx, *h.service); err != nil {
 			return err
 		} else {
@@ -471,10 +472,12 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	answers := filterRecords(req.msg, handle.service)
 	reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
 
-	if len(reqAs) > 0 && !equalAs(reqAs, as) {
+	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)
 		return true
-	} else if len(reqAAAAs) > 0 && !equalAAAAs(reqAAAAs, aaaas) {
+	}
+
+	if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
 		log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
 		return true
 	}
