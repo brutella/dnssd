@@ -264,7 +264,6 @@ func hostname() string {
 	return sanitizeHostname(name)
 }
 
-/// TODO make it a FQDN
 func sanitizeHostname(name string) string {
 	return strings.Replace(name, " ", "-", -1)
 }
