@@ -1,10 +1,11 @@
 package dnssd
 
 import (
-	"github.com/miekg/dns"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 type Cache struct {
@@ -94,21 +95,18 @@ loop:
 			if entry, ok := c.services[rr.Hdr.Name]; ok {
 				text := make(map[string]string)
 				for _, txt := range rr.Txt {
-					var pairs = strings.Split(txt, " ")
-					for _, pair := range pairs {
-						elems := strings.SplitN(pair, "=", 2)
-						if len(elems) == 2 {
-							key := elems[0]
-							value := elems[1]
+					elems := strings.SplitN(txt, "=", 2)
+					if len(elems) == 2 {
+						key := elems[0]
+						value := elems[1]
 
-							// Don't override existing keys
-							// TODO make txt records case insensitive
-							if _, ok := text[key]; !ok {
-								text[key] = value
-							}
-
+						// Don't override existing keys
+						// TODO make txt records case insensitive
+						if _, ok := text[key]; !ok {
 							text[key] = value
 						}
+
+						text[key] = value
 					}
 				}
 
