@@ -1,6 +1,7 @@
 package dnssd
 
 import (
+	"net"
 	"sort"
 	"strings"
 	"time"
