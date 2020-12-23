@@ -15,10 +15,18 @@ func LookupType(ctx context.Context, service string, add AddServiceFunc, rmv Rmv
 	}
 	defer conn.close()
 
-	return lookupType(ctx, service, conn, add, rmv)
+	return lookupType(ctx, service, conn, add, rmv,false)
 }
+func LookupTypeUnicast(ctx context.Context, service string, add AddServiceFunc, rmv RmvServiceFunc) (err error) {
+	conn, err := newMDNSConn()
+	if err != nil {
+		return err
+	}
+	defer conn.close()
 
-func lookupType(ctx context.Context, service string, conn MDNSConn, add AddServiceFunc, rmv RmvServiceFunc) (err error) {
+	return lookupType(ctx, service, conn, add, rmv,true)
+}
+func lookupType(ctx context.Context, service string, conn MDNSConn, add AddServiceFunc, rmv RmvServiceFunc, unicast bool) (err error) {
 	var cache = NewCache()
 
 	m := new(dns.Msg)
@@ -37,6 +45,9 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddServi
 	q := &Query{msg: m}
 	conn.SendQuery(q)
 
+	if unicast {
+		setQuestionUnicast(&m.Question[0])
+	}
 	for {
 		select {
 		case req := <-ch:
