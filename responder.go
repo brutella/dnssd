@@ -43,8 +43,6 @@ type responder struct {
 	upIfaces  []string
 }
 
-var DefaultResponder, _ = NewResponder()
-
 func NewResponder() (Responder, error) {
 	conn, err := newMDNSConn()
 	if err != nil {
