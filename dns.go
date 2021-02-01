@@ -2,10 +2,11 @@ package dnssd
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
 	"net"
 	"reflect"
 	"sort"
+
+	"github.com/miekg/dns"
 )
 
 func PTR(srv Service) *dns.PTR {
@@ -49,7 +50,7 @@ func SRV(srv Service) *dns.SRV {
 
 func TXT(srv Service) *dns.TXT {
 	keys := []string{}
-	for key, _ := range srv.Text {
+	for key := range srv.Text {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)

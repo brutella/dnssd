@@ -4,10 +4,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/brutella/dnssd"
 )
 
 var timeFormat = "15:04:05.000"
@@ -33,9 +34,7 @@ func main() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt)
 
-		select {
-		case <-stop:
-			cancel()
-		}
+		<-stop
+		cancel()
 	}
 }
