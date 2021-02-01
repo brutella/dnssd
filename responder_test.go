@@ -2,10 +2,11 @@ package dnssd
 
 import (
 	"context"
-	"github.com/miekg/dns"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 func TestRemove(t *testing.T) {
@@ -49,7 +50,7 @@ func TestRegisterServiceWithExplicitIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	sv.ifaceIPs = map[string][]net.IP{
-		"lo0": []net.IP{net.IP{192, 168, 0, 123}},
+		"lo0": {{192, 168, 0, 123}},
 	}
 
 	conn := newTestConn()

@@ -1,10 +1,11 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"net"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 // ServiceHandle serves a middleman between a service and a responder.

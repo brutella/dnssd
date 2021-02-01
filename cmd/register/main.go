@@ -43,48 +43,50 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if resp, err := dnssd.NewResponder(); err != nil {
+	resp, err := dnssd.NewResponder()
+	if err != nil {
 		fmt.Println(err)
-	} else {
-		ifaces := []string{}
-		if len(*interfaceFlag) > 0 {
-			ifaces = append(ifaces, *interfaceFlag)
+		os.Exit(1)
+	}
+
+	ifaces := []string{}
+	if len(*interfaceFlag) > 0 {
+		ifaces = append(ifaces, *interfaceFlag)
+	}
+
+	cfg := dnssd.Config{
+		Name:   *instanceFlag,
+		Type:   *serviceFlag,
+		Domain: *domainFlag,
+		Port:   *portFlag,
+		Ifaces: ifaces,
+	}
+	srv, err := dnssd.NewService(cfg)
+	if err != nil {
+		slog.Fatal(err)
+	}
+
+	go func() {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt)
+
+		<-stop
+		cancel()
+	}()
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		handle, errAdd := resp.Add(srv)
+		if errAdd != nil {
+			fmt.Println(errAdd)
+			return
 		}
 
-		cfg := dnssd.Config{
-			Name:   *instanceFlag,
-			Type:   *serviceFlag,
-			Domain: *domainFlag,
-			Port:   *portFlag,
-			Ifaces: ifaces,
-		}
-		srv, err := dnssd.NewService(cfg)
-		if err != nil {
-			slog.Fatal(err)
-		}
+		fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().ServiceInstanceName())
+	}()
 
-		go func() {
-			stop := make(chan os.Signal, 1)
-			signal.Notify(stop, os.Interrupt)
-
-			<-stop
-			cancel()
-		}()
-
-		go func() {
-			time.Sleep(1 * time.Second)
-			handle, errAdd := resp.Add(srv)
-			if errAdd != nil {
-				fmt.Println(errAdd)
-				return
-			}
-
-			fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().ServiceInstanceName())
-		}()
-
-		err = resp.Respond(ctx)
-		if err != nil {
-			fmt.Println(err)
-		}
+	err = resp.Respond(ctx)
+	if err != nil {
+		fmt.Println(err)
 	}
 }
