@@ -74,13 +74,13 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 
 		if conflict.hostname && (prevConflict.hostname || probeOnce) {
 			numHostConflicts++
-			candidate.Host = fmt.Sprintf("%s-%d", srv.Host, numHostConflicts+1)
+			candidate.Host = fmt.Sprintf("%s (%d)", srv.Host, numHostConflicts+1)
 			conflict.hostname = false
 		}
 
 		if conflict.serviceName && (prevConflict.serviceName || probeOnce) {
 			numNameConflicts++
-			candidate.Name = fmt.Sprintf("%s-%d", srv.Name, numNameConflicts+1)
+			candidate.Name = fmt.Sprintf("%s (%d)", srv.Name, numNameConflicts+1)
 			conflict.serviceName = false
 		}
 
@@ -104,19 +104,87 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 }
 
 func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeConflict, err error) {
+	var queries []*Query
 	for _, iface := range service.Interfaces() {
-		log.Debug.Printf("Probing at %s\n", iface.Name)
-		conflict, err := probeAtInterface(ctx, conn, service, iface)
-		if conflict.hasAny() {
-			return conflict, err
+		queries = append(queries, probeQuery(service, iface))
+	}
+
+	readCtx, readCancel := context.WithCancel(ctx)
+	defer readCancel()
+
+	// Multicast DNS responses received *before* the first probe packet is sent
+	// MUST be silently ignored. (RFC6762 8.1)
+	conn.Drain(readCtx)
+	ch := conn.Read(readCtx)
+
+	queryTime := time.After(1 * time.Millisecond)
+	queriesCount := 1
+
+	for {
+		select {
+		case rsp := <-ch:
+
+			if rsp.iface == nil {
+				continue
+			}
+
+			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp.msg, &service))
+
+			as := A(service, rsp.iface)
+			aaaas := AAAA(service, rsp.iface)
+			srv := SRV(service)
+
+			if len(reqAs) > 0 && len(as) > 0 && areDenyingAs(reqAs, as) {
+				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
+				log.Debug.Println(reqAs)
+				log.Debug.Println(as)
+				conflict.hostname = true
+			}
+
+			if len(reqAAAAs) > 0 && len(aaaas) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
+				log.Debug.Printf("%v:%d@%s denies AAAA\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
+				log.Debug.Println(reqAAAAs)
+				log.Debug.Println(aaaas)
+				conflict.hostname = true
+			}
+
+			for _, reqSRV := range reqSRVs {
+				if isDenyingSRV(reqSRV, srv) {
+					conflict.serviceName = true
+				}
+			}
+
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+
+		case <-queryTime:
+			// Stop on conflict
+			if conflict.hasAny() {
+				return conflict, err
+			}
+
+			// Stop after 3 probe queries
+			if queriesCount > 3 {
+				return
+			}
+
+			queriesCount++
+			for _, q := range queries {
+				log.Debug.Println("Sending probe", q.msg)
+				conn.SendQuery(q)
+			}
+
+			delay := 250 * time.Millisecond
+			log.Debug.Println("Waiting for conflicting data", delay)
+			queryTime = time.After(delay)
 		}
 	}
 
 	return probeConflict{}, nil
 }
 
-func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface net.Interface) (conflict probeConflict, err error) {
-
+func probeQuery(service Service, iface *net.Interface) *Query {
 	msg := new(dns.Msg)
 
 	instanceQ := dns.Question{
@@ -149,66 +217,7 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 	}
 	msg.Ns = authority
 
-	readCtx, readCancel := context.WithCancel(ctx)
-	defer readCancel()
-
-	// Multicast DNS responses received *before* the first probe packet is sent
-	// MUST be silently ignored. (RFC6762 8.1)
-	conn.Drain(readCtx)
-	ch := conn.Read(readCtx)
-
-	queryTime := time.After(1 * time.Millisecond)
-	queriesCount := 1
-
-	for {
-		select {
-		case rsp := <-ch:
-
-			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp.msg, &service))
-
-			if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
-				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
-				conflict.hostname = true
-			}
-
-			if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
-				log.Debug.Printf("%v:%d@%s denies AAAA\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
-				conflict.hostname = true
-			}
-
-			for _, reqSRV := range reqSRVs {
-				if isDenyingSRV(reqSRV, srv) {
-					conflict.serviceName = true
-				}
-			}
-
-		case <-ctx.Done():
-			err = ctx.Err()
-			return
-
-		case <-queryTime:
-			// Stop on conflict
-			if conflict.hasAny() {
-				return
-			}
-
-			// Stop after 3 probe queries
-			if queriesCount > 3 {
-				return
-			}
-
-			queriesCount++
-			log.Debug.Println("Sending probe", msg)
-			q := &Query{msg: msg, iface: &iface}
-			conn.SendQuery(q)
-
-			delay := 250 * time.Millisecond
-			log.Debug.Println("Waiting for conflicting data", delay)
-			queryTime = time.After(delay)
-		}
-	}
-
-	return
+	return &Query{msg: msg, iface: iface}
 }
 
 type probeConflict struct {
@@ -277,7 +286,7 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 // areDenyingAs returns true if this and that are denying each other.
 func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 	if len(this) != len(that) {
-		log.Debug.Println("A: different number of records is a conflict")
+		log.Debug.Printf("A: different number of records is a conflict (%d != %d)\n", len(this), len(that))
 		return true
 	}
 
@@ -297,7 +306,7 @@ func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 
 func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
 	if len(this) != len(that) {
-		log.Debug.Println("AAAA: different number of records is a conflict")
+		log.Debug.Printf("AAAA: different number of records is a conflict (%d != %d)\n", len(this), len(that))
 		return true
 	}
 

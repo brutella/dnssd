@@ -140,7 +140,7 @@ func newMDNSConn() (*mdnsConn, error) {
 		connIPv4.SetMulticastLoopback(true)
 
 		for _, iface := range multicastInterfaces() {
-			if err := connIPv4.JoinGroup(&iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
+			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv4 %v: %v", iface.Name, err)
 			} else {
 				log.Debug.Printf("Joined IPv4 %v", iface.Name)
@@ -159,7 +159,7 @@ func newMDNSConn() (*mdnsConn, error) {
 		connIPv6.SetMulticastLoopback(true)
 
 		for _, iface := range multicastInterfaces() {
-			if err := connIPv6.JoinGroup(&iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
+			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv6 %v: %v", iface.Name, err)
 			} else {
 				log.Debug.Printf("Joined IPv6 %v", iface.Name)

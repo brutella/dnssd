@@ -54,7 +54,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	qs := make(chan *Query)
 	go func() {
 		for _, iface := range multicastInterfaces() {
-			q := &Query{msg: m, iface: &iface}
+			q := &Query{msg: m, iface: iface}
 			qs <- q
 		}
 	}()

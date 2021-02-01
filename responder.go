@@ -122,7 +122,7 @@ func (r *responder) announce(services []*Service) {
 	}
 }
 
-func (r *responder) announceAtInterface(service *Service, iface net.Interface) {
+func (r *responder) announceAtInterface(service *Service, iface *net.Interface) {
 	ips := service.IPsAtInterface(iface)
 	if len(ips) == 0 {
 		log.Debug.Printf("No IPs for service %s at %s\n", service.ServiceInstanceName(), iface.Name)
@@ -146,7 +146,7 @@ func (r *responder) announceAtInterface(service *Service, iface net.Interface) {
 
 	setAnswerCacheFlushBit(msg)
 
-	resp := &Response{msg: msg, iface: &iface}
+	resp := &Response{msg: msg, iface: iface}
 
 	log.Debug.Println("Sending 1st announcement", msg)
 	r.conn.SendResponse(resp)
@@ -362,15 +362,15 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		extra := []dns.RR{SRV(srv), TXT(srv)}
 
-		for _, a := range A(srv, *req.iface) {
+		for _, a := range A(srv, req.iface) {
 			extra = append(extra, a)
 		}
 
-		for _, aaaa := range AAAA(srv, *req.iface) {
+		for _, aaaa := range AAAA(srv, req.iface) {
 			extra = append(extra, aaaa)
 		}
 
-		extra = append(extra, NSEC(ptr, srv, *req.iface))
+		extra = append(extra, NSEC(ptr, srv, req.iface))
 		resp.Extra = extra
 
 		// Wait 20-125 msec for shared resource responses
@@ -383,15 +383,15 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		var extra []dns.RR
 
-		for _, a := range A(srv, *req.iface) {
+		for _, a := range A(srv, req.iface) {
 			extra = append(extra, a)
 		}
 
-		for _, aaaa := range AAAA(srv, *req.iface) {
+		for _, aaaa := range AAAA(srv, req.iface) {
 			extra = append(extra, aaaa)
 		}
 
-		nsec := NSEC(SRV(srv), srv, *req.iface)
+		nsec := NSEC(SRV(srv), srv, req.iface)
 		if nsec != nil {
 			extra = append(extra, nsec)
 		}
@@ -404,16 +404,16 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 	case strings.ToLower(srv.Hostname()):
 		var answer []dns.RR
 
-		for _, a := range A(srv, *req.iface) {
+		for _, a := range A(srv, req.iface) {
 			answer = append(answer, a)
 		}
 
-		for _, aaaa := range AAAA(srv, *req.iface) {
+		for _, aaaa := range AAAA(srv, req.iface) {
 			answer = append(answer, aaaa)
 		}
 
 		resp.Answer = answer
-		nsec := NSEC(SRV(srv), srv, *req.iface)
+		nsec := NSEC(SRV(srv), srv, req.iface)
 
 		if nsec != nil {
 			resp.Extra = []dns.RR{nsec}
@@ -462,8 +462,8 @@ func services(hs []*serviceHandle) []*Service {
 }
 
 func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
-	as := A(*handle.service, *req.iface)
-	aaaas := AAAA(*handle.service, *req.iface)
+	as := A(*handle.service, req.iface)
+	aaaas := AAAA(*handle.service, req.iface)
 	srv := SRV(*handle.service)
 
 	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, handle.service))

@@ -70,7 +70,7 @@ func TXT(srv Service) *dns.TXT {
 	}
 }
 
-func NSEC(rr dns.RR, srv Service, iface net.Interface) *dns.NSEC {
+func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	switch r := rr.(type) {
 	case *dns.PTR:
 		return &dns.NSEC{
@@ -112,7 +112,7 @@ func NSEC(rr dns.RR, srv Service, iface net.Interface) *dns.NSEC {
 	return nil
 }
 
-func A(srv Service, iface net.Interface) []*dns.A {
+func A(srv Service, iface *net.Interface) []*dns.A {
 	ips := srv.IPsAtInterface(iface)
 
 	var as []*dns.A
@@ -134,7 +134,7 @@ func A(srv Service, iface net.Interface) []*dns.A {
 	return as
 }
 
-func AAAA(srv Service, iface net.Interface) []*dns.AAAA {
+func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
 	ips := srv.IPsAtInterface(iface)
 
 	var aaaas []*dns.AAAA
@@ -160,9 +160,14 @@ func splitRecords(records []dns.RR) (as []*dns.A, aaaas []*dns.AAAA, srvs []*dns
 	for _, record := range records {
 		switch rr := record.(type) {
 		case *dns.A:
-			as = append(as, rr)
+			if rr.A.To4() != nil {
+				as = append(as, rr)
+			}
+
 		case *dns.AAAA:
-			aaaas = append(aaaas, rr)
+			if rr.AAAA.To16() != nil {
+				aaaas = append(aaaas, rr)
+			}
 		case *dns.SRV:
 			srvs = append(srvs, rr)
 		}

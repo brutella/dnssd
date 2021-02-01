@@ -130,12 +130,12 @@ func NewService(cfg Config) (s Service, err error) {
 
 // Interfaces returns the network interfaces for which the service is registered,
 // or all multicast network interfaces, if no IP addresses are specified.
-func (s *Service) Interfaces() []net.Interface {
+func (s *Service) Interfaces() []*net.Interface {
 	if len(s.Ifaces) > 0 {
-		ifis := []net.Interface{}
+		ifis := []*net.Interface{}
 		for _, name := range s.Ifaces {
 			if ifi, err := net.InterfaceByName(name); err == nil {
-				ifis = append(ifis, *ifi)
+				ifis = append(ifis, ifi)
 			}
 		}
 
@@ -146,7 +146,7 @@ func (s *Service) Interfaces() []net.Interface {
 }
 
 // IPsAtInterface returns the ip address at a specific interface.
-func (s *Service) IPsAtInterface(iface net.Interface) []net.IP {
+func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	if ips, ok := s.ifaceIPs[iface.Name]; ok {
 		return ips
 	}
@@ -282,14 +282,15 @@ func parseHostname(str string) (name string, domain string) {
 }
 
 // multicastInterfaces returns a list of all available multicast network interfaces.
-func multicastInterfaces() []net.Interface {
-	var tmp []net.Interface
+func multicastInterfaces() []*net.Interface {
+	var tmp []*net.Interface
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
 	}
 
 	for _, iface := range ifaces {
+		iface := iface
 		if (iface.Flags & net.FlagUp) == 0 {
 			continue
 		}
@@ -305,7 +306,7 @@ func multicastInterfaces() []net.Interface {
 		}
 		for _, addr := range addrs {
 			if _, _, err := net.ParseCIDR(addr.String()); err == nil {
-				tmp = append(tmp, iface)
+				tmp = append(tmp, &iface)
 				break
 			}
 		}

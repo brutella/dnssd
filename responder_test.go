@@ -83,7 +83,7 @@ func TestRegisterServiceWithExplicitIP(t *testing.T) {
 			t.Fatalf("%v != %v", is, want)
 		}
 
-		ips := srv.IPsAtInterface(net.Interface{Name: "lo0"})
+		ips := srv.IPsAtInterface(&net.Interface{Name: "lo0"})
 		if is, want := len(ips), 1; is != want {
 			t.Fatalf("%v != %v", is, want)
 		}

@@ -1,7 +1,6 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 
 	"context"
@@ -83,6 +82,7 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
+	// log.Debug.Enable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
@@ -91,7 +91,7 @@ func TestProbing(t *testing.T) {
 		t.Fatal("can not find the local interface")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	conn := newTestConn()
 	otherConn := newTestConn()
@@ -128,28 +128,20 @@ func TestProbing(t *testing.T) {
 		defer rcancel()
 
 		r.addManaged(rsrv)
-		log.Debug.Println("asdf")
 		r.Respond(rctx)
 	}()
 
-	// Wait until second service was announced.
-	// This doesn't take long because we set the IP address
-	// explicitely. Therefore no probing is done.
-	<-time.After(500 * time.Millisecond)
-
-	log.Debug.Println(r.managed)
-
-	resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
+	resolved, err := probeService(ctx, conn, srv, 500*time.Millisecond, true)
 
 	if x := err; x != nil {
 		t.Fatal(x)
 	}
 
-	if is, want := resolved.Host, "My-Computer-2"; is != want {
+	if is, want := resolved.Host, "My-Computer (2)"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 
-	if is, want := resolved.Name, "My Service-2"; is != want {
+	if is, want := resolved.Name, "My Service (2)"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 
