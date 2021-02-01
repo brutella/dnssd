@@ -287,8 +287,6 @@ func (r *responder) unannounce(services []*Service) {
 		msg.Answer = rrs
 		msg.Response = true
 		msg.Authoritative = true
-
-		log.Debug.Printf("Send %v to %s\n", msg, name)
 		resp := &Response{msg: msg, iface: iface}
 		r.conn.SendResponse(resp)
 		time.Sleep(250 * time.Millisecond)
