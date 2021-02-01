@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	_ "time"
 )
 
 type BrowseEntry struct {

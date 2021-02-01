@@ -102,13 +102,15 @@ func (r *responder) Respond(ctx context.Context) error {
 	r.isRunning = true
 	for _, h := range r.unmanaged {
 		log.Debug.Println(h.service)
-		if srv, err := r.register(ctx, *h.service); err != nil {
+		srv, err := r.register(ctx, *h.service)
+		if err != nil {
 			return err
-		} else {
-			h.service = &srv
-			r.managed = append(r.managed, h)
 		}
+
+		h.service = &srv
+		r.managed = append(r.managed, h)
 	}
+
 	r.unmanaged = []*serviceHandle{}
 	r.mutex.Unlock()
 

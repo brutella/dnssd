@@ -175,7 +175,7 @@ func newMDNSConn() (*mdnsConn, error) {
 
 	if connIPv4 == nil && connIPv6 == nil {
 		err := first(errs...)
-		return nil, fmt.Errorf("Failed setting up UDP server: %v", err)
+		return nil, fmt.Errorf("failed setting up UDP server: %v", err)
 	}
 
 	return &mdnsConn{
