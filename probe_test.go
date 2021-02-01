@@ -82,7 +82,6 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
-	// log.Debug.Enable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
@@ -105,23 +104,23 @@ func TestProbing(t *testing.T) {
 		Port:   12334,
 		Ifaces: []string{testIface.Name},
 	}
-	srv, err := NewService(cfg)
+	srv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	srv.ifaceIPs = map[string][]net.IP{
-		testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
+		testIface.Name: {net.IP{192, 168, 0, 122}},
 	}
 
 	r := newResponder(otherConn)
 	go func() {
-		rcfg := cfg.Copy()
-		rsrv, srvErr := NewService(rcfg)
+		rcfg := cfg // shallow copy is implicit
+		rsrv, srvErr := NewService(&rcfg)
 		if srvErr != nil {
 			t.Fatal(srvErr)
 		}
 		rsrv.ifaceIPs = map[string][]net.IP{
-			testIface.Name: []net.IP{net.IP{192, 168, 0, 123}},
+			testIface.Name: {net.IP{192, 168, 0, 123}},
 		}
 
 		rctx, rcancel := context.WithCancel(ctx)
@@ -186,7 +185,7 @@ func TestDenyingAs(t *testing.T) {
 	}{
 		{
 			This: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -197,7 +196,7 @@ func TestDenyingAs(t *testing.T) {
 				},
 			},
 			That: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -211,7 +210,7 @@ func TestDenyingAs(t *testing.T) {
 		},
 		{
 			This: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -227,7 +226,7 @@ func TestDenyingAs(t *testing.T) {
 		{
 			This: []*dns.A{},
 			That: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,

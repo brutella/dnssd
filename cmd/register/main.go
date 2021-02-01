@@ -25,7 +25,7 @@ var timeFormat = "15:04:05.000"
 
 func main() {
 	flag.Parse()
-	if len(*instanceFlag) == 0 || len(*serviceFlag) == 0 || len(*domainFlag) == 0 {
+	if *instanceFlag == "" || *serviceFlag == "" || *domainFlag == "" {
 		flag.Usage()
 		return
 	}
@@ -46,7 +46,7 @@ func main() {
 	resp, err := dnssd.NewResponder()
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return
 	}
 
 	ifaces := []string{}
@@ -61,7 +61,7 @@ func main() {
 		Port:   *portFlag,
 		Ifaces: ifaces,
 	}
-	srv, err := dnssd.NewService(cfg)
+	srv, err := dnssd.NewService(&cfg)
 	if err != nil {
 		slog.Fatal(err)
 	}

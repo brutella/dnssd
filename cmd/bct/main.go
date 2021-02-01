@@ -40,7 +40,7 @@ func main() {
 				Type: "_asdf._tcp",
 				Port: 12345,
 			}
-			srv, err := dnssd.NewService(cfg)
+			srv, err := dnssd.NewService(&cfg)
 			if err != nil {
 				log.Debug.Fatal(err)
 			}

@@ -39,19 +39,6 @@ type Config struct {
 	Ifaces []string
 }
 
-func (c Config) Copy() Config {
-	return Config{
-		Name:   c.Name,
-		Type:   c.Type,
-		Domain: c.Domain,
-		Host:   c.Host,
-		Text:   c.Text,
-		IPs:    c.IPs,
-		Port:   c.Port,
-		Ifaces: c.Ifaces,
-	}
-}
-
 // Service represents a DNS-SD service instance
 type Service struct {
 	Name   string
@@ -69,17 +56,17 @@ type Service struct {
 	expiration time.Time
 }
 
-func NewService(cfg Config) (s Service, err error) {
+func NewService(cfg *Config) (s *Service, err error) {
 	name := cfg.Name
 	typ := cfg.Type
 	port := cfg.Port
 
-	if len(name) == 0 {
+	if name == "" {
 		err = fmt.Errorf("invalid name \"%s\"", name)
 		return
 	}
 
-	if len(typ) == 0 {
+	if typ == "" {
 		err = fmt.Errorf("invalid type \"%s\"", typ)
 		return
 	}
@@ -90,12 +77,12 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	domain := cfg.Domain
-	if len(domain) == 0 {
+	if domain == "" {
 		domain = "local"
 	}
 
 	host := cfg.Host
-	if len(host) == 0 {
+	if host == "" {
 		host = hostname()
 	}
 
@@ -115,7 +102,7 @@ func NewService(cfg Config) (s Service, err error) {
 		Ifaces = cfg.Ifaces
 	}
 
-	return Service{
+	return &Service{
 		Name:     name,
 		Type:     typ,
 		Domain:   domain,
@@ -172,7 +159,7 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	return ips
 }
 
-func (s Service) Copy() *Service {
+func (s *Service) Copy() *Service {
 	return &Service{
 		Name:       s.Name,
 		Type:       s.Type,
@@ -188,15 +175,15 @@ func (s Service) Copy() *Service {
 	}
 }
 
-func (s Service) ServiceInstanceName() string {
+func (s *Service) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", s.Name, s.Type, s.Domain)
 }
 
-func (s Service) ServiceName() string {
+func (s *Service) ServiceName() string {
 	return fmt.Sprintf("%s.%s.", s.Type, s.Domain)
 }
 
-func (s Service) Hostname() string {
+func (s *Service) Hostname() string {
 	return fmt.Sprintf("%s.%s.", s.Host, s.Domain)
 }
 
@@ -207,18 +194,19 @@ func (s *Service) SetHostname(hostname string) {
 	}
 }
 
-func (s Service) ServicesMetaQueryName() string {
+func (s *Service) ServicesMetaQueryName() string {
 	return fmt.Sprintf("_services._dns-sd._udp.%s.", s.Domain)
 }
 
 func (s *Service) addIP(ip net.IP, iface *net.Interface) {
 	s.IPs = append(s.IPs, ip)
+
 	if iface != nil {
-		ifaceIPs := []net.IP{ip}
-		if ips, ok := s.ifaceIPs[iface.Name]; ok {
-			ifaceIPs = append(ips, ip)
+		if _, ok := s.ifaceIPs[iface.Name]; !ok {
+			s.ifaceIPs[iface.Name] = []net.IP{}
 		}
-		s.ifaceIPs[iface.Name] = ifaceIPs
+
+		s.ifaceIPs[iface.Name] = append(s.ifaceIPs[iface.Name], ip)
 	}
 }
 
@@ -235,7 +223,7 @@ func newService(instance string) *Service {
 	}
 }
 
-func parseServiceInstanceName(str string) (name string, service string, domain string) {
+func parseServiceInstanceName(str string) (name, service, domain string) {
 	elems := strings.Split(str, ".")
 	if len(elems) > 0 {
 		name = elems[0]
@@ -268,7 +256,7 @@ func sanitizeHostname(name string) string {
 	return strings.Replace(name, " ", "-", -1)
 }
 
-func parseHostname(str string) (name string, domain string) {
+func parseHostname(str string) (name, domain string) {
 	elems := strings.Split(str, ".")
 	if len(elems) > 0 {
 		name = elems[0]

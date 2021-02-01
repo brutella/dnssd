@@ -30,7 +30,7 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	return lookupType(ctx, service, conn, add, rmv)
 }
 
-func (e BrowseEntry) ServiceInstanceName() string {
+func (e *BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
 }
 

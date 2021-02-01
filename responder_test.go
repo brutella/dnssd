@@ -15,7 +15,7 @@ func TestRemove(t *testing.T) {
 		Type: "_asdf._tcp",
 		Port: 1234,
 	}
-	si, err := NewService(cfg)
+	si, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRegisterServiceWithExplicitIP(t *testing.T) {
 		Port:   12345,
 		Ifaces: []string{"lo0"},
 	}
-	sv, err := NewService(cfg)
+	sv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

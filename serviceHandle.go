@@ -11,7 +11,7 @@ import (
 // ServiceHandle serves a middleman between a service and a responder.
 type ServiceHandle interface {
 	UpdateText(text map[string]string, r Responder)
-	Service() Service
+	Service() *Service
 }
 
 type serviceHandle struct {
@@ -22,7 +22,7 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 	h.service.Text = text
 
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{TXT(*h.service)}
+	msg.Answer = []dns.RR{TXT(h.service)}
 	msg.Response = true
 	msg.Authoritative = true
 
@@ -45,8 +45,8 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 	log.Debug.Println("Reannounce TXT", text)
 }
 
-func (h *serviceHandle) Service() Service {
-	return *h.service
+func (h *serviceHandle) Service() *Service {
+	return h.service
 }
 
 func (h *serviceHandle) IPv4s() []net.IP {

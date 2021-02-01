@@ -19,7 +19,7 @@ type ReadFunc func(*Request)
 type Responder interface {
 	// Add adds a service to the responder.
 	// Use the returned service handle to update service properties.
-	Add(srv Service) (ServiceHandle, error)
+	Add(srv *Service) (ServiceHandle, error)
 
 	// Remove removes the service associated with the service handle from the responder.
 	Remove(srv ServiceHandle)
@@ -78,7 +78,7 @@ func (r *responder) Remove(h ServiceHandle) {
 	}
 }
 
-func (r *responder) Add(srv Service) (ServiceHandle, error) {
+func (r *responder) Add(srv *Service) (ServiceHandle, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -102,12 +102,12 @@ func (r *responder) Respond(ctx context.Context) error {
 	r.isRunning = true
 	for _, h := range r.unmanaged {
 		log.Debug.Println(h.service)
-		srv, err := r.register(ctx, *h.service)
+		srv, err := r.register(ctx, h.service)
 		if err != nil {
 			return err
 		}
 
-		h.service = &srv
+		h.service = srv
 		r.managed = append(r.managed, h)
 	}
 
@@ -134,15 +134,15 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	}
 
 	var answer []dns.RR
-	answer = append(answer, SRV(*service))
-	answer = append(answer, PTR(*service))
-	answer = append(answer, TXT(*service))
-	for _, a := range A(*service, iface) {
+	answer = append(answer, SRV(service), PTR(service), TXT(service))
+	for _, a := range A(service, iface) {
 		answer = append(answer, a)
 	}
-	for _, aaaa := range AAAA(*service, iface) {
+
+	for _, aaaa := range AAAA(service, iface) {
 		answer = append(answer, aaaa)
 	}
+
 	msg := new(dns.Msg)
 	msg.Answer = answer
 	msg.Response = true
@@ -165,7 +165,7 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	}
 }
 
-func (r *responder) register(ctx context.Context, srv Service) (Service, error) {
+func (r *responder) register(ctx context.Context, srv *Service) (*Service, error) {
 	if !r.isRunning {
 		return srv, fmt.Errorf("cannot register service when responder is not responding")
 	}
@@ -173,10 +173,10 @@ func (r *responder) register(ctx context.Context, srv Service) (Service, error) 
 	log.Debug.Printf("Probing for host %s and service %s…\n", srv.Hostname(), srv.ServiceInstanceName())
 	probed, err := ProbeService(ctx, srv)
 	if err != nil {
-		return srv, err
+		return nil, err
 	}
 
-	srvs := []*Service{&probed}
+	srvs := []*Service{probed}
 	for _, h := range r.managed {
 		srvs = append(srvs, h.service)
 	}
@@ -185,14 +185,14 @@ func (r *responder) register(ctx context.Context, srv Service) (Service, error) 
 	return probed, nil
 }
 
-func (r *responder) addManaged(srv Service) ServiceHandle {
-	h := &serviceHandle{&srv}
+func (r *responder) addManaged(srv *Service) ServiceHandle {
+	h := &serviceHandle{srv}
 	r.managed = append(r.managed, h)
 	return h
 }
 
-func (r *responder) addUnmanaged(srv Service) ServiceHandle {
-	h := &serviceHandle{&srv}
+func (r *responder) addUnmanaged(srv *Service) ServiceHandle {
+	h := &serviceHandle{srv}
 	r.unmanaged = append(r.unmanaged, h)
 	return h
 }
@@ -271,7 +271,7 @@ func (r *responder) unannounce(services []*Service) {
 	// collect records per interface
 	rrsByIfaceName := map[string][]dns.RR{}
 	for _, srv := range services {
-		rr := PTR(*srv)
+		rr := PTR(srv)
 		rr.Header().Ttl = 0
 		for _, iface := range srv.Interfaces() {
 			ips := srv.IPsAtInterface(iface)
@@ -316,7 +316,7 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 		msgs := []*dns.Msg{}
 		for _, srv := range services {
 			log.Debug.Printf("%s tries to give response to question %v\n", srv.ServiceInstanceName(), q)
-			if msg := r.handleQuestion(q, req, *srv); msg != nil {
+			if msg := r.handleQuestion(q, req, srv); msg != nil {
 				msgs = append(msgs, msg)
 			} else {
 				log.Debug.Println("No response")
@@ -354,11 +354,11 @@ func (r *responder) reprobe(h *serviceHandle) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	probed, err := ReprobeService(ctx, *h.service)
+	probed, err := ReprobeService(ctx, h.service)
 	if err != nil {
 		return
 	}
-	h.service = &probed
+	h.service = probed
 
 	r.mutex.Lock()
 	managed := append(r.managed, h)
@@ -369,7 +369,7 @@ func (r *responder) reprobe(h *serviceHandle) {
 	go r.announce(services(managed))
 }
 
-func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *dns.Msg {
+func (r *responder) handleQuestion(q dns.Question, req *Request, srv *Service) *dns.Msg {
 	resp := new(dns.Msg)
 
 	switch strings.ToLower(q.Name) {
@@ -479,9 +479,9 @@ func services(hs []*serviceHandle) []*Service {
 }
 
 func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
-	as := A(*handle.service, req.iface)
-	aaaas := AAAA(*handle.service, req.iface)
-	srv := SRV(*handle.service)
+	as := A(handle.service, req.iface)
+	aaaas := AAAA(handle.service, req.iface)
+	srv := SRV(handle.service)
 
 	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, handle.service))
 

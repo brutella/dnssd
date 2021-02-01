@@ -9,7 +9,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-func PTR(srv Service) *dns.PTR {
+func PTR(srv *Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServiceName(),
@@ -21,7 +21,7 @@ func PTR(srv Service) *dns.PTR {
 	}
 }
 
-func DNSSDServicesPTR(srv Service) *dns.PTR {
+func DNSSDServicesPTR(srv *Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServicesMetaQueryName(),
@@ -33,7 +33,7 @@ func DNSSDServicesPTR(srv Service) *dns.PTR {
 	}
 }
 
-func SRV(srv Service) *dns.SRV {
+func SRV(srv *Service) *dns.SRV {
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServiceInstanceName(),
@@ -48,7 +48,7 @@ func SRV(srv Service) *dns.SRV {
 	}
 }
 
-func TXT(srv Service) *dns.TXT {
+func TXT(srv *Service) *dns.TXT {
 	keys := []string{}
 	for key := range srv.Text {
 		keys = append(keys, key)
@@ -71,7 +71,7 @@ func TXT(srv Service) *dns.TXT {
 	}
 }
 
-func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
+func NSEC(rr dns.RR, srv *Service, iface *net.Interface) *dns.NSEC {
 	switch r := rr.(type) {
 	case *dns.PTR:
 		return &dns.NSEC{
@@ -113,7 +113,7 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	return nil
 }
 
-func A(srv Service, iface *net.Interface) []*dns.A {
+func A(srv *Service, iface *net.Interface) []*dns.A {
 	ips := srv.IPsAtInterface(iface)
 
 	var as []*dns.A
@@ -135,7 +135,7 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 	return as
 }
 
-func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
+func AAAA(srv *Service, iface *net.Interface) []*dns.AAAA {
 	ips := srv.IPsAtInterface(iface)
 
 	var aaaas []*dns.AAAA
