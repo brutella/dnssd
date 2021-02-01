@@ -60,6 +60,4 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 			return
 		}
 	}
-
-	return
 }
