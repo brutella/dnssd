@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"context"
+
 	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 )
@@ -18,7 +19,7 @@ func LookupInstance(ctx context.Context, instance string) (Service, error) {
 	return lookupInstance(ctx, instance, conn)
 }
 
-func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Service, err error) {
+func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Service, error) {
 	var cache = NewCache()
 
 	m := new(dns.Msg)
@@ -52,12 +53,10 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 		case req := <-ch:
 			cache.UpdateFrom(req.msg, req.iface)
 			if s, ok := cache.services[instance]; ok {
-				srv = *s
-				return
+				return *s, nil
 			}
 		case <-ctx.Done():
-			err = ctx.Err()
-			return
+			return Service{}, ctx.Err()
 		}
 	}
 }

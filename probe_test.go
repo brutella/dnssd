@@ -116,9 +116,9 @@ func TestProbing(t *testing.T) {
 	r := newResponder(otherConn)
 	go func() {
 		rcfg := cfg.Copy()
-		rsrv, err := NewService(rcfg)
-		if err != nil {
-			t.Fatal(err)
+		rsrv, srvErr := NewService(rcfg)
+		if srvErr != nil {
+			t.Fatal(srvErr)
 		}
 		rsrv.ifaceIPs = map[string][]net.IP{
 			testIface.Name: []net.IP{net.IP{192, 168, 0, 123}},

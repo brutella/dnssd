@@ -73,15 +73,16 @@ func main() {
 
 		go func() {
 			time.Sleep(1 * time.Second)
-			handle, err := resp.Add(srv)
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().ServiceInstanceName())
+			handle, errAdd := resp.Add(srv)
+			if errAdd != nil {
+				fmt.Println(errAdd)
+				return
 			}
-		}()
-		err = resp.Respond(ctx)
 
+			fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().ServiceInstanceName())
+		}()
+
+		err = resp.Respond(ctx)
 		if err != nil {
 			fmt.Println(err)
 		}

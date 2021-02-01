@@ -3,13 +3,14 @@ package dnssd
 import (
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 type ReadFunc func(*Request)
@@ -85,11 +86,12 @@ func (r *responder) Add(srv Service) (ServiceHandle, error) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
-		if srv, err := r.register(ctx, srv); err != nil {
+		srvResult, err := r.register(ctx, srv)
+		if err != nil {
 			return nil, err
-		} else {
-			return r.addManaged(srv), nil
 		}
+
+		return r.addManaged(srvResult), nil
 	}
 
 	return r.addUnmanaged(srv), nil
