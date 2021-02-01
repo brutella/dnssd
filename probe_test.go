@@ -117,8 +117,10 @@ func TestProbing(t *testing.T) {
 		rcfg := cfg // shallow copy is implicit
 		rsrv, srvErr := NewService(&rcfg)
 		if srvErr != nil {
-			t.Fatal(srvErr)
+			t.Error(srvErr)
+			return
 		}
+
 		rsrv.ifaceIPs = map[string][]net.IP{
 			testIface.Name: {net.IP{192, 168, 0, 123}},
 		}
@@ -127,7 +129,10 @@ func TestProbing(t *testing.T) {
 		defer rcancel()
 
 		r.addManaged(rsrv)
-		r.Respond(rctx)
+
+		if resErr := r.Respond(rctx); resErr != nil {
+			t.Error(resErr)
+		}
 	}()
 
 	resolved, err := probeService(ctx, conn, srv, 500*time.Millisecond, true)

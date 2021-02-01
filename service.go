@@ -149,11 +149,13 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 
 	ips := []net.IP{}
 	for _, addr := range addrs {
-		if ip, _, err := net.ParseCIDR(addr.String()); err == nil {
-			ips = append(ips, ip)
-		} else {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
 			log.Debug.Println(err)
+			continue
 		}
+
+		ips = append(ips, ip)
 	}
 
 	return ips
