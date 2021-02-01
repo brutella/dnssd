@@ -163,7 +163,7 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 	for {
 		select {
 		case req := <-ch:
-			answers := allRecords(req.msg)
+			answers := filterRecords(req.msg, &service)
 			for _, answer := range answers {
 				switch rr := answer.(type) {
 				case *dns.A:
