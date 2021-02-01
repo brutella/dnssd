@@ -163,27 +163,34 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 	for {
 		select {
 		case req := <-ch:
-			if req.iface.Name != iface.Name {
-				log.Debug.Println("Ignore msg from", req.iface.Name)
-				break
-			}
+			answers := allRecords(req.msg)
+			for _, answer := range answers {
+				switch rr := answer.(type) {
+				case *dns.A:
+					for _, a := range as {
+						if isDenyingA(rr, a) {
+							log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.IfaceName())
+							conflict.hostname = true
+							break
+						}
+					}
 
-			answers := filterRecords(req.msg, &service)
-			reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
+				case *dns.AAAA:
+					for _, aaaa := range aaaas {
+						if isDenyingAAAA(rr, aaaa) {
+							log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.IfaceName())
+							conflict.hostname = true
+							break
+						}
+					}
 
-			if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
-				log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.iface.Name)
-				log.Debug.Printf("%v != %v\n", reqAs, as)
-				conflict.hostname = true
-			} else if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
-				log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.iface.Name)
-				log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
-				conflict.hostname = true
-			}
+				case *dns.SRV:
+					if isDenyingSRV(rr, srv) {
+						conflict.serviceName = true
+					}
 
-			for _, reqSRV := range reqSRVs {
-				if isDenyingSRV(reqSRV, srv) {
-					conflict.serviceName = true
+				default:
+					break
 				}
 			}
 

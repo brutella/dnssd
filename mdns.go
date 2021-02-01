@@ -50,7 +50,17 @@ type Request struct {
 }
 
 func (r Request) String() string {
-	return fmt.Sprintf("%s@%s\n%v", r.from.IP, r.iface.Name, r.msg)
+	return fmt.Sprintf("%s@%s\n%v", r.from.IP, r.IfaceName(), r.msg)
+}
+
+// IfaceName returns the name of the network interface where the request was received.
+// If the network interface is unknown, the string "?" is returned.
+func (r Request) IfaceName() string {
+	if r.iface != nil {
+		return r.iface.Name
+	}
+
+	return "?"
 }
 
 // MDNSConn represents a mDNS connection. It encapsulates an IPv4 and IPv6 UDP connection.
@@ -123,8 +133,11 @@ func newMDNSConn() (*mdnsConn, error) {
 		errs = append(errs, err)
 	} else {
 		connIPv4 = ipv4.NewPacketConn(conn)
-		connIPv4.SetControlMessage(ipv4.FlagInterface, true)
-		connIPv4.SetMulticastLoopback(true)
+		if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
+			log.Debug.Printf("IPv4 interface socket opt: %v", err)
+		}
+		// Don't send us our own messages back
+		connIPv4.SetMulticastLoopback(false)
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv4.JoinGroup(&iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
@@ -139,8 +152,11 @@ func newMDNSConn() (*mdnsConn, error) {
 		errs = append(errs, err)
 	} else {
 		connIPv6 = ipv6.NewPacketConn(conn)
-		connIPv6.SetControlMessage(ipv6.FlagInterface, true)
-		connIPv6.SetMulticastLoopback(true)
+		if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
+			log.Debug.Printf("IPv6 interface socket opt: %v", err)
+		}
+		// Don't send us our own messages back
+		connIPv6.SetMulticastLoopback(false)
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv6.JoinGroup(&iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
