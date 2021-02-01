@@ -104,6 +104,7 @@ func (r *responder) Respond(ctx context.Context) error {
 		log.Debug.Println(h.service)
 		srv, err := r.register(ctx, h.service)
 		if err != nil {
+			r.mutex.Unlock()
 			return err
 		}
 
