@@ -51,7 +51,7 @@ func ReprobeService(ctx context.Context, srv Service) (Service, error) {
 	return probeService(ctx, conn, srv, 1*time.Millisecond, true)
 }
 
-func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Duration, probeOnce bool) (s Service, e error) {
+func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Duration, probeOnce bool) (Service, error) {
 	candidate := srv.Copy()
 	prevConflict := probeConflict{}
 
@@ -62,13 +62,11 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 	for i := 1; i <= 100; i++ {
 		conflict, err := probe(ctx, conn, *candidate)
 		if err != nil {
-			e = err
-			return
+			return Service{}, err
 		}
 
 		if conflict.hasNone() {
-			s = *candidate
-			return
+			return *candidate, nil
 		}
 
 		candidate = candidate.Copy()
@@ -101,7 +99,7 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 		time.Sleep(delay)
 	}
 
-	return
+	return Service{}, nil
 }
 
 func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeConflict, err error) {

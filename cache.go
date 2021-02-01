@@ -120,7 +120,7 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service,
 	// TODO remove outdated services regularly
 	rmvs = c.removeExpired()
 
-	return
+	return adds, rmvs
 }
 
 func (c *Cache) removeExpired() []*Service {
