@@ -23,8 +23,8 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 
 	m := new(dns.Msg)
 
-	srvQ := dns.Question{instance, dns.TypeSRV, dns.ClassINET}
-	txtQ := dns.Question{instance, dns.TypeTXT, dns.ClassINET}
+	srvQ := dns.Question{Name: instance, Qtype: dns.TypeSRV, Qclass: dns.ClassINET}
+	txtQ := dns.Question{Name: instance, Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 	setQuestionUnicast(&srvQ)
 	setQuestionUnicast(&txtQ)
 

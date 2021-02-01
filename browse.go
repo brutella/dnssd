@@ -40,7 +40,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 	m := new(dns.Msg)
 	m.Question = []dns.Question{
-		dns.Question{service, dns.TypePTR, dns.ClassINET},
+		{Name: service, Qtype: dns.TypePTR, Qclass: dns.ClassINET},
 	}
 	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Supression)
 	// m.Answer = ...
