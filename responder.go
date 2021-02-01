@@ -149,10 +149,16 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	resp := &Response{msg: msg, iface: iface}
 
 	log.Debug.Println("Sending 1st announcement", msg)
-	r.conn.SendResponse(resp)
+	if err := r.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 1st announcement: %s\n", err)
+	}
+
 	time.Sleep(1 * time.Second)
+
 	log.Debug.Println("Sending 2nd announcement", msg)
-	r.conn.SendResponse(resp)
+	if err := r.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 2nd announcement: %s\n", err)
+	}
 }
 
 func (r *responder) register(ctx context.Context, srv Service) (Service, error) {
@@ -283,14 +289,21 @@ func (r *responder) unannounce(services []*Service) {
 			log.Debug.Printf("Interface %s not found\n", name)
 			continue
 		}
+
 		msg := new(dns.Msg)
 		msg.Answer = rrs
 		msg.Response = true
 		msg.Authoritative = true
 		resp := &Response{msg: msg, iface: iface}
-		r.conn.SendResponse(resp)
+		if err := r.conn.SendResponse(resp); err != nil {
+			log.Debug.Printf("Failed to send 1st goodbye response: %s\n", err)
+		}
+
 		time.Sleep(250 * time.Millisecond)
-		r.conn.SendResponse(resp)
+
+		if err := r.conn.SendResponse(resp); err != nil {
+			log.Debug.Printf("Failed to send 2nd goodbye response: %s\n", err)
+		}
 	}
 }
 

@@ -172,7 +172,9 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 			queriesCount++
 			for _, q := range queries {
 				log.Debug.Println("Sending probe", q.msg)
-				conn.SendQuery(q)
+				if err := conn.SendQuery(q); err != nil {
+					log.Debug.Printf("Failed to send probe: %s\n", err)
+				}
 			}
 
 			delay := 250 * time.Millisecond

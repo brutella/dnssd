@@ -31,9 +31,15 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 
 	rr := r.(*responder)
 
-	rr.conn.SendResponse(resp)
+	if err := rr.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 1st update text response: %s\n", err)
+	}
+
 	time.Sleep(1 * time.Second)
-	rr.conn.SendResponse(resp)
+
+	if err := rr.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 2nd update text response: %s\n", err)
+	}
 
 	log.Debug.Println("Reannounce TXT", text)
 }

@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd"
-	"github.com/brutella/dnssd/log"
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/brutella/dnssd"
+	"github.com/brutella/dnssd/log"
 )
 
 func main() {
@@ -49,8 +50,7 @@ func main() {
 			}
 		}()
 
-		resp.Respond(ctx)
-		if err != nil {
+		if err := resp.Respond(ctx); err != nil {
 			fmt.Println(err)
 		}
 	}
