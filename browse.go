@@ -41,7 +41,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	m.Question = []dns.Question{
 		{Name: service, Qtype: dns.TypePTR, Qclass: dns.ClassINET},
 	}
-	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Supression)
+	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Suppression)
 	// m.Answer = ...
 	// m.Authoritive = false // because our answers are *believes*
 

@@ -446,7 +446,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 		return nil
 	}
 
-	// Supress known answers
+	// Suppress known answers
 	resp.Answer = remove(req.msg.Answer, resp.Answer)
 
 	resp.SetReply(req.msg)
