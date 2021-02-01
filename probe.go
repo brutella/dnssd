@@ -7,6 +7,7 @@ import (
 	"github.com/miekg/dns"
 	"math/rand"
 	"net"
+	"sort"
 	"strings"
 	"time"
 )
@@ -130,9 +131,8 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 		Qclass: dns.ClassINET,
 	}
 
-	// TODO Responses to probe should be unicast
-	// setQuestionUnicast(&instanceQ)
-	// setQuestionUnicast(&hostQ)
+	setQuestionUnicast(&instanceQ)
+	setQuestionUnicast(&hostQ)
 
 	msg.Question = []dns.Question{instanceQ, hostQ}
 
@@ -162,35 +162,23 @@ func probeAtInterface(ctx context.Context, conn MDNSConn, service Service, iface
 
 	for {
 		select {
-		case req := <-ch:
-			answers := filterRecords(req.msg, &service)
-			for _, answer := range answers {
-				switch rr := answer.(type) {
-				case *dns.A:
-					for _, a := range as {
-						if isDenyingA(rr, a) {
-							log.Debug.Printf("%v:%d@%s denies A\n", req.from.IP, req.from.Port, req.IfaceName())
-							conflict.hostname = true
-							break
-						}
-					}
+		case rsp := <-ch:
 
-				case *dns.AAAA:
-					for _, aaaa := range aaaas {
-						if isDenyingAAAA(rr, aaaa) {
-							log.Debug.Printf("%v:%d@%s denies AAAA\n", req.from.IP, req.from.Port, req.IfaceName())
-							conflict.hostname = true
-							break
-						}
-					}
+			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp.msg, &service))
 
-				case *dns.SRV:
-					if isDenyingSRV(rr, srv) {
-						conflict.serviceName = true
-					}
+			if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
+				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
+				conflict.hostname = true
+			}
 
-				default:
-					break
+			if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
+				log.Debug.Printf("%v:%d@%s denies AAAA\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
+				conflict.hostname = true
+			}
+
+			for _, reqSRV := range reqSRVs {
+				if isDenyingSRV(reqSRV, srv) {
+					conflict.serviceName = true
 				}
 			}
 
@@ -286,18 +274,15 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 	return false
 }
 
+// areDenyingAs returns true if this and that are denying each other.
 func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 	if len(this) != len(that) {
-		// different number of As are a conflict
+		log.Debug.Println("A: different number of records is a conflict")
 		return true
 	}
 
-	if equalAs(this, that) {
-		return false // equal As are no conlict
-	}
-
-	if len(this) == 1 && !isDenyingA(this[0], that[0]) {
-		// this doesn't deny that but the other way around
+	if equalIPs(aIPs(this), aIPs(that)) {
+		log.Debug.Println("A: same records are no conflict")
 		return false
 	}
 
@@ -306,92 +291,67 @@ func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 
 func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
 	if len(this) != len(that) {
-		// different number of AAAAs are a conflict
+		log.Debug.Println("AAAA: different number of records is a conflict")
 		return true
 	}
 
-	if equalAAAAs(this, that) {
+	if equalIPs(aaaaIPs(this), aaaaIPs(that)) {
+		log.Debug.Println("AAAA: same records are no conflict")
 		return false // equal AAAAs are no conlict
-	}
-
-	if len(this) == 1 && !isDenyingAAAA(this[0], that[0]) {
-		// this doesn't deny that but the other way around
-		return false
 	}
 
 	return true
 }
 
-func equalAs(this []*dns.A, that []*dns.A) bool {
-	var tmp = that
-	for _, ti := range this {
-		var found = false
-		for i, ta := range tmp {
-			if compareIP(ti.A.To4(), ta.A.To4()) == 0 {
-				tmp = append(tmp[:i], tmp[i+1:]...)
-				found = true
-				break
-			}
+// aIPs returns the IP addresses of the records.
+func aIPs(rs []*dns.A) []net.IP {
+	var tmp []net.IP
+	for _, r := range rs {
+		if ip := r.A.To4(); ip != nil {
+			tmp = append(tmp, ip)
 		}
-		if !found {
+	}
+
+	return tmp
+}
+
+// aaaaIPs returns the IP addresses of the records.
+func aaaaIPs(rs []*dns.AAAA) []net.IP {
+	var tmp []net.IP
+	for _, r := range rs {
+		if ip := r.AAAA.To16(); ip != nil {
+			tmp = append(tmp, ip)
+		}
+	}
+
+	return tmp
+}
+
+// equalIPs returns true if this and that contain the same IP addresses.
+// The order of the elements in the arrays do not matter.
+func equalIPs(this []net.IP, that []net.IP) bool {
+	if len(this) != len(that) {
+		return false
+	}
+	sort.Sort(byString(this))
+	sort.Sort(byString(that))
+
+	for i, ti := range this {
+		ta := that[i]
+		if compareIP(ti, ta) != 0 {
 			return false
 		}
 	}
 
-	return len(tmp) == 0
+	return true
 }
 
-func equalAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
-	var tmp = that
-	for _, ti := range this {
-		var found = false
-		for i, ta := range tmp {
-			if compareIP(ti.AAAA.To16(), ta.AAAA.To16()) == 0 {
-				tmp = append(tmp[:i], tmp[i+1:]...)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
+type byString []net.IP
 
-	return len(tmp) == 0
-}
-
-func containedInAs(this *dns.A, aaas []*dns.A) bool {
-	for _, that := range aaas {
-		if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
-			if !isValidRR(this) {
-				log.Debug.Println("Invalid record produces conflict")
-				return false
-			}
-
-			if compareIP(this.A.To4(), that.A.To4()) == 0 {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func containedInAAAAs(this *dns.AAAA, aaas []*dns.AAAA) bool {
-	for _, that := range aaas {
-		if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
-			if !isValidRR(this) {
-				log.Debug.Println("Invalid record produces conflict")
-				return false
-			}
-
-			if compareIP(this.AAAA.To16(), that.AAAA.To16()) == 0 {
-				return true
-			}
-		}
-	}
-
-	return false
+func (a byString) Len() int      { return len(a) }
+func (a byString) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byString) Less(i, j int) bool {
+	return strings.Compare(a[i].String(), a[j].String()) == -1
 }
 
 // isDenyingSRV returns true if this denies that.

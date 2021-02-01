@@ -298,10 +298,6 @@ func multicastInterfaces() []net.Interface {
 			continue
 		}
 
-		if (iface.Flags & net.FlagLoopback) != 0 {
-			continue
-		}
-
 		// check for a valid ip at that interface
 		addrs, err := iface.Addrs()
 		if err != nil {

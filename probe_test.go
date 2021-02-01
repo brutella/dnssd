@@ -188,3 +188,48 @@ func TestIsLexicographicLater(t *testing.T) {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 }
+
+func TestEqualIPs(t *testing.T) {
+	tests := []struct {
+		This   []net.IP
+		That   []net.IP
+		Result bool
+	}{
+		{
+			This:   []net.IP{net.ParseIP("169.254.99.200")},
+			That:   []net.IP{net.ParseIP("169.254.99.200")},
+			Result: true,
+		},
+		{
+			This:   []net.IP{},
+			That:   []net.IP{net.ParseIP("169.254.99.200")},
+			Result: false,
+		},
+		{
+			This:   []net.IP{net.ParseIP("169.254.99.200")},
+			That:   []net.IP{},
+			Result: false,
+		},
+		{
+			This:   []net.IP{},
+			That:   []net.IP{},
+			Result: true,
+		},
+		{
+			This:   []net.IP{net.ParseIP("169.254.99.200"), net.ParseIP("169.254.99.1")},
+			That:   []net.IP{net.ParseIP("169.254.99.1"), net.ParseIP("169.254.99.200")},
+			Result: true,
+		},
+		{
+			This:   []net.IP{net.ParseIP("fe80::1")},
+			That:   []net.IP{net.ParseIP("169.254.99.1"), net.ParseIP("169.254.99.200")},
+			Result: false,
+		},
+	}
+
+	for _, test := range tests {
+		if is, want := equalIPs(test.This, test.That), test.Result; is != want {
+			t.Fatalf("%v == %v is=%v want=%v", test.This, test.That, is, want)
+		}
+	}
+}

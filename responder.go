@@ -288,6 +288,7 @@ func (r *responder) unannounce(services []*Service) {
 		msg.Response = true
 		msg.Authoritative = true
 
+		log.Debug.Printf("Send %v to %s\n", msg, name)
 		resp := &Response{msg: msg, iface: iface}
 		r.conn.SendResponse(resp)
 		time.Sleep(250 * time.Millisecond)
@@ -467,8 +468,7 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	aaaas := AAAA(*handle.service, *req.iface)
 	srv := SRV(*handle.service)
 
-	answers := filterRecords(req.msg, handle.service)
-	reqAs, reqAAAAs, reqSRVs := splitRecords(answers)
+	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, handle.service))
 
 	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)
