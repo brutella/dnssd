@@ -281,12 +281,18 @@ func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 		return true
 	}
 
-	if equalIPs(aIPs(this), aIPs(that)) {
-		log.Debug.Println("A: same records are no conflict")
-		return false
+	sort.Sort(byAIP(this))
+	sort.Sort(byAIP(that))
+
+	for i, ti := range this {
+		ta := that[i]
+		if isDenyingA(ti, ta) {
+			return true
+		}
 	}
 
-	return true
+	log.Debug.Println("A: same records are no conflict")
+	return false
 }
 
 func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
@@ -295,63 +301,34 @@ func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
 		return true
 	}
 
-	if equalIPs(aaaaIPs(this), aaaaIPs(that)) {
-		log.Debug.Println("AAAA: same records are no conflict")
-		return false // equal AAAAs are no conlict
-	}
-
-	return true
-}
-
-// aIPs returns the IP addresses of the records.
-func aIPs(rs []*dns.A) []net.IP {
-	var tmp []net.IP
-	for _, r := range rs {
-		if ip := r.A.To4(); ip != nil {
-			tmp = append(tmp, ip)
-		}
-	}
-
-	return tmp
-}
-
-// aaaaIPs returns the IP addresses of the records.
-func aaaaIPs(rs []*dns.AAAA) []net.IP {
-	var tmp []net.IP
-	for _, r := range rs {
-		if ip := r.AAAA.To16(); ip != nil {
-			tmp = append(tmp, ip)
-		}
-	}
-
-	return tmp
-}
-
-// equalIPs returns true if this and that contain the same IP addresses.
-// The order of the elements in the arrays do not matter.
-func equalIPs(this []net.IP, that []net.IP) bool {
-	if len(this) != len(that) {
-		return false
-	}
-	sort.Sort(byString(this))
-	sort.Sort(byString(that))
+	sort.Sort(byAAAAIP(this))
+	sort.Sort(byAAAAIP(that))
 
 	for i, ti := range this {
 		ta := that[i]
-		if compareIP(ti, ta) != 0 {
-			return false
+		if isDenyingAAAA(ti, ta) {
+			return true
 		}
 	}
 
-	return true
+	log.Debug.Println("AAAA: same records are no conflict")
+	return false
 }
 
-type byString []net.IP
+type byAIP []*dns.A
 
-func (a byString) Len() int      { return len(a) }
-func (a byString) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a byString) Less(i, j int) bool {
-	return strings.Compare(a[i].String(), a[j].String()) == -1
+func (a byAIP) Len() int      { return len(a) }
+func (a byAIP) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byAIP) Less(i, j int) bool {
+	return strings.Compare(a[i].A.To4().String(), a[j].A.To4().String()) == -1
+}
+
+type byAAAAIP []*dns.AAAA
+
+func (a byAAAAIP) Len() int      { return len(a) }
+func (a byAAAAIP) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byAAAAIP) Less(i, j int) bool {
+	return strings.Compare(a[i].AAAA.To16().String(), a[j].AAAA.To16().String()) == -1
 }
 
 // isDenyingSRV returns true if this denies that.

@@ -83,7 +83,6 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
-	log.Debug.Disable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
@@ -114,8 +113,8 @@ func TestProbing(t *testing.T) {
 		testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
 	}
 
-	t.Run("responder", func(t *testing.T) {
-		t.Parallel()
+	r := newResponder(otherConn)
+	go func() {
 		rcfg := cfg.Copy()
 		rsrv, err := NewService(rcfg)
 		if err != nil {
@@ -128,35 +127,33 @@ func TestProbing(t *testing.T) {
 		rctx, rcancel := context.WithCancel(ctx)
 		defer rcancel()
 
-		r := newResponder(otherConn)
 		r.addManaged(rsrv)
+		log.Debug.Println("asdf")
 		r.Respond(rctx)
-	})
+	}()
 
 	// Wait until second service was announced.
 	// This doesn't take long because we set the IP address
 	// explicitely. Therefore no probing is done.
 	<-time.After(500 * time.Millisecond)
 
-	t.Run("prober", func(t *testing.T) {
-		t.Parallel()
+	log.Debug.Println(r.managed)
 
-		resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
+	resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
 
-		if x := err; x != nil {
-			t.Fatal(x)
-		}
+	if x := err; x != nil {
+		t.Fatal(x)
+	}
 
-		if is, want := resolved.Host, "My-Computer-2"; is != want {
-			t.Fatalf("is=%v want=%v", is, want)
-		}
+	if is, want := resolved.Host, "My-Computer-2"; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
 
-		if is, want := resolved.Name, "My Service-2"; is != want {
-			t.Fatalf("is=%v want=%v", is, want)
-		}
+	if is, want := resolved.Name, "My Service-2"; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
 
-		cancel()
-	})
+	cancel()
 }
 
 func TestIsLexicographicLater(t *testing.T) {
@@ -189,47 +186,77 @@ func TestIsLexicographicLater(t *testing.T) {
 	}
 }
 
-func TestEqualIPs(t *testing.T) {
+func TestDenyingAs(t *testing.T) {
 	tests := []struct {
-		This   []net.IP
-		That   []net.IP
+		This   []*dns.A
+		That   []*dns.A
 		Result bool
 	}{
 		{
-			This:   []net.IP{net.ParseIP("169.254.99.200")},
-			That:   []net.IP{net.ParseIP("169.254.99.200")},
-			Result: true,
-		},
-		{
-			This:   []net.IP{},
-			That:   []net.IP{net.ParseIP("169.254.99.200")},
+			This: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			That: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
 			Result: false,
 		},
 		{
-			This:   []net.IP{net.ParseIP("169.254.99.200")},
-			That:   []net.IP{},
-			Result: false,
-		},
-		{
-			This:   []net.IP{},
-			That:   []net.IP{},
+			This: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			That:   []*dns.A{},
 			Result: true,
 		},
 		{
-			This:   []net.IP{net.ParseIP("169.254.99.200"), net.ParseIP("169.254.99.1")},
-			That:   []net.IP{net.ParseIP("169.254.99.1"), net.ParseIP("169.254.99.200")},
+			This: []*dns.A{},
+			That: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
 			Result: true,
 		},
 		{
-			This:   []net.IP{net.ParseIP("fe80::1")},
-			That:   []net.IP{net.ParseIP("169.254.99.1"), net.ParseIP("169.254.99.200")},
+			This:   []*dns.A{},
+			That:   []*dns.A{},
 			Result: false,
 		},
 	}
 
 	for _, test := range tests {
-		if is, want := equalIPs(test.This, test.That), test.Result; is != want {
-			t.Fatalf("%v == %v is=%v want=%v", test.This, test.That, is, want)
+		if is, want := areDenyingAs(test.This, test.That), test.Result; is != want {
+			t.Fatalf("%v != %v is=%v want=%v", test.This, test.That, is, want)
 		}
 	}
 }
