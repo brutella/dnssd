@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -175,7 +176,7 @@ func newMDNSConn() (*mdnsConn, error) {
 
 	if connIPv4 == nil && connIPv6 == nil {
 		err := first(errs...)
-		return nil, fmt.Errorf("failed setting up UDP server: %v", err)
+		return nil, fmt.Errorf("failed setting up UDP server: %w", err)
 	}
 
 	return &mdnsConn{
@@ -203,7 +204,7 @@ func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
 func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 	isDone := func(ctx context.Context) bool {
-		return ctx.Err() == context.Canceled
+		return errors.Is(ctx.Err(), context.Canceled)
 	}
 
 	if c.ipv4 != nil {
