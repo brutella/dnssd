@@ -104,8 +104,10 @@ func probeService(ctx context.Context, conn MDNSConn, srv *Service, delay time.D
 }
 
 func probe(ctx context.Context, conn MDNSConn, service *Service) (conflict probeConflict, err error) {
-	var queries []*Query
-	for _, iface := range service.Interfaces() {
+	ifaces := service.Interfaces()
+	queries := make([]*Query, 0, len(ifaces))
+
+	for _, iface := range ifaces {
 		queries = append(queries, probeQuery(service, iface))
 	}
 

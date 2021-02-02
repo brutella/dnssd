@@ -174,7 +174,7 @@ func filterRecords(m *dns.Msg, service *Service) []dns.RR {
 		return all
 	}
 
-	var answers []dns.RR
+	answers := []dns.RR{}
 
 	for _, answer := range all {
 		switch rr := answer.(type) {

@@ -504,7 +504,7 @@ func findConflicts(req *Request, hs []*serviceHandle) []*serviceHandle {
 }
 
 func services(hs []*serviceHandle) []*Service {
-	var result []*Service
+	result := make([]*Service, 0, len(hs))
 	for _, h := range hs {
 		result = append(result, h.service)
 	}
