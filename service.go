@@ -93,14 +93,14 @@ func NewService(cfg *Config) (s *Service, err error) {
 	}
 
 	ips := []net.IP{}
-	var Ifaces []string
+	ifaces := []string{}
 
 	if cfg.IPs != nil && len(cfg.IPs) > 0 {
 		ips = cfg.IPs
 	}
 
 	if cfg.Ifaces != nil && len(cfg.Ifaces) > 0 {
-		Ifaces = cfg.Ifaces
+		ifaces = cfg.Ifaces
 	}
 
 	return &Service{
@@ -111,7 +111,7 @@ func NewService(cfg *Config) (s *Service, err error) {
 		Text:     text,
 		Port:     port,
 		IPs:      ips,
-		Ifaces:   Ifaces,
+		Ifaces:   ifaces,
 		ifaceIPs: map[string][]net.IP{},
 	}, nil
 }
@@ -121,6 +121,7 @@ func NewService(cfg *Config) (s *Service, err error) {
 func (s *Service) Interfaces() []*net.Interface {
 	if len(s.Ifaces) > 0 {
 		ifis := []*net.Interface{}
+
 		for _, name := range s.Ifaces {
 			if ifi, err := net.InterfaceByName(name); err == nil {
 				ifis = append(ifis, ifi)
@@ -149,6 +150,7 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	}
 
 	ips := []net.IP{}
+
 	for _, addr := range addrs {
 		ip, _, err := net.ParseCIDR(addr.String())
 		if err != nil {
@@ -215,6 +217,7 @@ func (s *Service) addIP(ip net.IP, iface *net.Interface) {
 
 func newService(instance string) *Service {
 	name, typ, domain := parseServiceInstanceName(instance)
+
 	return &Service{
 		Name:     name,
 		Type:     typ,
@@ -252,6 +255,7 @@ func hostname() string {
 	}
 
 	name, _ := parseHostname(hostname)
+
 	return sanitizeHostname(name)
 }
 
@@ -275,6 +279,7 @@ func parseHostname(str string) (name, domain string) {
 // multicastInterfaces returns a list of all available multicast network interfaces.
 func multicastInterfaces() []*net.Interface {
 	var tmp []*net.Interface
+
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
@@ -295,6 +300,7 @@ func multicastInterfaces() []*net.Interface {
 		if err != nil {
 			continue
 		}
+
 		for _, addr := range addrs {
 			if _, _, err := net.ParseCIDR(addr.String()); err == nil {
 				tmp = append(tmp, &iface)

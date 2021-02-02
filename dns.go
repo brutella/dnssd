@@ -54,6 +54,7 @@ func TXT(srv *Service) *dns.TXT {
 	for key := range srv.Text {
 		keys = append(keys, key)
 	}
+
 	sort.Strings(keys)
 
 	txts := []string{}
@@ -87,10 +88,12 @@ func NSEC(rr dns.RR, srv *Service, iface *net.Interface) *dns.NSEC {
 		}
 	case *dns.SRV:
 		types := []uint16{}
+
 		ips := srv.IPsAtInterface(iface)
 		if includesIPv4(ips) {
 			types = append(types, dns.TypeA)
 		}
+
 		if includesIPv6(ips) {
 			types = append(types, dns.TypeAAAA)
 		}
@@ -115,9 +118,9 @@ func NSEC(rr dns.RR, srv *Service, iface *net.Interface) *dns.NSEC {
 }
 
 func A(srv *Service, iface *net.Interface) []*dns.A {
-	ips := srv.IPsAtInterface(iface)
-
 	var as []*dns.A
+
+	ips := srv.IPsAtInterface(iface)
 	for _, ip := range ips {
 		if ip.To4() != nil {
 			a := &dns.A{
@@ -137,12 +140,12 @@ func A(srv *Service, iface *net.Interface) []*dns.A {
 }
 
 func AAAA(srv *Service, iface *net.Interface) []*dns.AAAA {
-	ips := srv.IPsAtInterface(iface)
-
 	var aaaas []*dns.AAAA
+
+	ips := srv.IPsAtInterface(iface)
 	for _, ip := range ips {
 		if ip.To4() == nil && ip.To16() != nil {
-			aaaa := &dns.AAAA{
+			aaaas = append(aaaas, &dns.AAAA{
 				Hdr: dns.RR_Header{
 					Name:   srv.Hostname(),
 					Rrtype: dns.TypeAAAA,
@@ -150,8 +153,7 @@ func AAAA(srv *Service, iface *net.Interface) []*dns.AAAA {
 					Ttl:    TTLHostname,
 				},
 				AAAA: ip,
-			}
-			aaaas = append(aaaas, aaaa)
+			})
 		}
 	}
 
@@ -174,6 +176,7 @@ func splitRecords(records []dns.RR) (as []*dns.A, aaaas []*dns.AAAA, srvs []*dns
 			srvs = append(srvs, rr)
 		}
 	}
+
 	return
 }
 
@@ -202,8 +205,10 @@ func includesIPv6(ips []net.IP) bool {
 // Removes this from that.
 func remove(this, that []dns.RR) []dns.RR {
 	var result []dns.RR
+
 	for _, thatRr := range that {
 		isUnknown := true
+
 		for _, thisRr := range this {
 			switch a := thisRr.(type) {
 			case *dns.PTR:
@@ -247,9 +252,11 @@ func mergeMsgs(msgs []*dns.Msg) *dns.Msg {
 		if msg.Answer != nil {
 			resp.Answer = append(resp.Answer, remove(resp.Answer, msg.Answer)...)
 		}
+
 		if msg.Ns != nil {
 			resp.Ns = append(resp.Ns, remove(resp.Ns, msg.Ns)...)
 		}
+
 		if msg.Extra != nil {
 			resp.Extra = append(resp.Extra, remove(resp.Extra, msg.Extra)...)
 		}

@@ -25,6 +25,7 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	if err != nil {
 		return err
 	}
+
 	defer conn.close()
 
 	return lookupType(ctx, service, conn, add, rmv)
@@ -49,8 +50,8 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	defer readCancel()
 
 	ch := conn.Read(readCtx)
-
 	qs := make(chan *Query)
+
 	go func() {
 		for _, iface := range multicastInterfaces() {
 			q := &Query{msg: m, iface: iface}
@@ -59,10 +60,12 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	}()
 
 	es := []*BrowseEntry{}
+
 	for {
 		select {
 		case q := <-qs:
 			log.Debug.Printf("Send browsing query at %s\n%s\n", q.iface.Name, q.msg)
+
 			if err := conn.SendQuery(q); err != nil {
 				log.Debug.Println("SendQuery:", err)
 			}
@@ -70,6 +73,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 		case req := <-ch:
 			log.Debug.Printf("Receive message at %s\n%s\n", req.iface.Name, req.msg)
 			cache.UpdateFrom(req.msg, req.iface)
+
 			for _, srv := range cache.Services() {
 				if srv.ServiceName() != service {
 					continue
@@ -77,12 +81,14 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 				for ifaceName, ips := range srv.ifaceIPs {
 					var found = false
+
 					for _, e := range es {
 						if e.Name == srv.Name && e.IfaceName == ifaceName {
 							found = true
 							break
 						}
 					}
+
 					if !found {
 						e := BrowseEntry{
 							IPs:       ips,
@@ -91,6 +97,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 							Type:      srv.Type,
 							Domain:    srv.Domain,
 						}
+
 						es = append(es, &e)
 						add(e)
 					}
@@ -98,8 +105,10 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 			}
 
 			tmp := []*BrowseEntry{}
+
 			for _, e := range es {
 				var found = false
+
 				for _, srv := range cache.Services() {
 					if srv.ServiceInstanceName() == e.ServiceInstanceName() {
 						found = true
@@ -114,6 +123,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 					rmv(*e)
 				}
 			}
+
 			es = tmp
 		case <-ctx.Done():
 			return ctx.Err()

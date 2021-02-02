@@ -44,6 +44,7 @@ func (c *testConn) SendQuery(q *Query) error {
 	go func() {
 		c.out <- q.msg
 	}()
+
 	return nil
 }
 
@@ -57,6 +58,7 @@ func (c *testConn) SendResponse(resp *Response) error {
 
 func (c *testConn) Read(ctx context.Context) <-chan *Request {
 	go c.start(ctx)
+
 	return c.read
 }
 
@@ -86,6 +88,7 @@ func TestProbing(t *testing.T) {
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
 	}
+
 	if testIface == nil {
 		t.Fatal("can not find the local interface")
 	}
@@ -104,17 +107,21 @@ func TestProbing(t *testing.T) {
 		Port:   12334,
 		Ifaces: []string{testIface.Name},
 	}
+
 	srv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	srv.ifaceIPs = map[string][]net.IP{
 		testIface.Name: {net.IP{192, 168, 0, 122}},
 	}
 
 	r := newResponder(otherConn)
+
 	go func() {
 		rcfg := cfg // shallow copy is implicit
+
 		rsrv, srvErr := NewService(&rcfg)
 		if srvErr != nil {
 			t.Error(srvErr)

@@ -25,8 +25,9 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Servic
 	m := new(dns.Msg)
 
 	srvQ := dns.Question{Name: instance, Qtype: dns.TypeSRV, Qclass: dns.ClassINET}
-	txtQ := dns.Question{Name: instance, Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 	setQuestionUnicast(&srvQ)
+
+	txtQ := dns.Question{Name: instance, Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 	setQuestionUnicast(&txtQ)
 
 	m.Question = []dns.Question{srvQ, txtQ}
@@ -35,8 +36,8 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Servic
 	defer readCancel()
 
 	ch := conn.Read(readCtx)
-
 	qs := make(chan *Query)
+
 	go func() {
 		for _, iface := range multicastInterfaces() {
 			q := &Query{msg: m, iface: iface}
@@ -52,6 +53,7 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Servic
 			}
 		case req := <-ch:
 			cache.UpdateFrom(req.msg, req.iface)
+
 			if s, ok := cache.services[instance]; ok {
 				return *s, nil
 			}

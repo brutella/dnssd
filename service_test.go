@@ -101,6 +101,7 @@ func TestNewServiceWithExplicitIP(t *testing.T) {
 		IPs:  []net.IP{net.ParseIP("127.0.0.1")},
 		Port: 1234,
 	}
+
 	sv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)

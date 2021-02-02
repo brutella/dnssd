@@ -24,6 +24,7 @@ func (c *Cache) Services() []*Service {
 	for _, s := range c.services {
 		tmp = append(tmp, s)
 	}
+
 	return tmp
 }
 
@@ -36,16 +37,19 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Se
 	for _, answer := range answers {
 		switch rr := answer.(type) {
 		case *dns.PTR:
+			var entry *Service
+
 			ttl := time.Duration(rr.Hdr.Ttl) * time.Second
 
-			var entry *Service
 			if e, ok := c.services[rr.Ptr]; !ok {
 				if ttl == 0 {
 					// Ignore new records with no ttl
 					break
 				}
+
 				entry = newService(rr.Ptr)
 				adds = append(adds, entry)
+
 				c.services[entry.ServiceInstanceName()] = entry
 			} else {
 				entry = e
@@ -55,13 +59,16 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Se
 			entry.expiration = time.Now().Add(ttl)
 
 		case *dns.SRV:
-			ttl := time.Duration(rr.Hdr.Ttl) * time.Second
 			var entry *Service
+
+			ttl := time.Duration(rr.Hdr.Ttl) * time.Second
+
 			if e, ok := c.services[rr.Hdr.Name]; !ok {
 				if ttl == 0 {
 					// Ignore new records with no ttl
 					break
 				}
+
 				entry = newService(rr.Hdr.Name)
 				adds = append(adds, entry)
 				c.services[entry.ServiceInstanceName()] = entry
@@ -91,6 +98,7 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Se
 		case *dns.TXT:
 			if entry, ok := c.services[rr.Hdr.Name]; ok {
 				text := make(map[string]string)
+
 				for _, txt := range rr.Txt {
 					elems := strings.SplitN(txt, "=", 2)
 					if len(elems) == 2 {
@@ -125,10 +133,12 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Se
 
 func (c *Cache) removeExpired() []*Service {
 	var outdated []*Service
+
 	var services = c.services
 	for key, srv := range services {
 		if time.Now().After(srv.expiration) {
 			outdated = append(outdated, srv)
+
 			delete(c.services, key)
 		}
 	}
@@ -165,6 +175,7 @@ func filterRecords(m *dns.Msg, service *Service) []dns.RR {
 	}
 
 	var answers []dns.RR
+
 	for _, answer := range all {
 		switch rr := answer.(type) {
 		case *dns.SRV:
@@ -180,6 +191,7 @@ func filterRecords(m *dns.Msg, service *Service) []dns.RR {
 				continue
 			}
 		}
+
 		answers = append(answers, answer)
 	}
 

@@ -25,6 +25,7 @@ var timeFormat = "15:04:05.000"
 
 func main() {
 	flag.Parse()
+
 	if *instanceFlag == "" || *serviceFlag == "" || *domainFlag == "" {
 		flag.Usage()
 		return
@@ -61,6 +62,7 @@ func main() {
 		Port:   *portFlag,
 		Ifaces: ifaces,
 	}
+
 	srv, err := dnssd.NewService(&cfg)
 	if err != nil {
 		slog.Fatal(err)
@@ -76,6 +78,7 @@ func main() {
 
 	go func() {
 		time.Sleep(1 * time.Second)
+
 		handle, addErr := resp.Add(srv)
 		if addErr != nil {
 			fmt.Println(addErr)

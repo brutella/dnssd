@@ -23,10 +23,13 @@ func main() {
 	signal.Notify(stop, os.Interrupt)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	go func() {
 		for {
-			reader := bufio.NewReader(os.Stdin)
 			fmt.Print("Enter name \nor\nexit\n>")
+
+			reader := bufio.NewReader(os.Stdin)
 			name, _ := reader.ReadString('\n')
 			name = strings.Trim(name, "\n")
 
@@ -40,10 +43,12 @@ func main() {
 				Type: "_asdf._tcp",
 				Port: 12345,
 			}
+
 			srv, err := dnssd.NewService(&cfg)
 			if err != nil {
 				log.Debug.Fatal(err)
 			}
+
 			log.Debug.Printf("%+v\n", srv)
 			h, _ := resp.Add(srv)
 

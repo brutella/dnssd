@@ -47,6 +47,7 @@ func ReprobeService(ctx context.Context, srv *Service) (*Service, error) {
 	}
 
 	defer conn.close()
+
 	return probeService(ctx, conn, srv, 1*time.Millisecond, true)
 }
 
@@ -89,6 +90,7 @@ func probeService(ctx context.Context, conn MDNSConn, srv *Service, delay time.D
 			// then it defers to the winning host by waiting one second,
 			// and then begins probing for this record again. (RFC6762 8.2)
 			log.Debug.Println("Increase wait time after receiving conflicting data")
+
 			delay = 1 * time.Second
 		} else {
 			delay = 250 * time.Millisecond
@@ -121,7 +123,6 @@ func probe(ctx context.Context, conn MDNSConn, service *Service) (conflict probe
 	for {
 		select {
 		case rsp := <-ch:
-
 			if rsp.iface == nil {
 				continue
 			}
@@ -136,6 +137,7 @@ func probe(ctx context.Context, conn MDNSConn, service *Service) (conflict probe
 				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
 				log.Debug.Println(reqAs)
 				log.Debug.Println(as)
+
 				conflict.hostname = true
 			}
 
@@ -143,6 +145,7 @@ func probe(ctx context.Context, conn MDNSConn, service *Service) (conflict probe
 				log.Debug.Printf("%v:%d@%s denies AAAA\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
 				log.Debug.Println(reqAAAAs)
 				log.Debug.Println(aaaas)
+
 				conflict.hostname = true
 			}
 
@@ -168,8 +171,10 @@ func probe(ctx context.Context, conn MDNSConn, service *Service) (conflict probe
 			}
 
 			queriesCount++
+
 			for _, q := range queries {
 				log.Debug.Println("Sending probe", q.msg)
+
 				if err := conn.SendQuery(q); err != nil {
 					log.Debug.Printf("Failed to send probe: %s\n", err)
 				}
@@ -210,9 +215,11 @@ func probeQuery(service *Service, iface *net.Interface) *Query {
 	for _, a := range as {
 		authority = append(authority, a)
 	}
+
 	for _, aaaa := range aaaas {
 		authority = append(authority, aaaa)
 	}
+
 	msg.Ns = authority
 
 	return &Query{msg: msg, iface: iface}
@@ -258,6 +265,7 @@ func isDenyingA(this, that *dns.A) bool {
 func isDenyingAAAA(this, that *dns.AAAA) bool {
 	if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
 		log.Debug.Println("Same hosts")
+
 		if !isValidRR(this) {
 			log.Debug.Println("Invalid record produces conflict")
 			return true
@@ -295,6 +303,7 @@ func areDenyingAs(this, that []*dns.A) bool {
 	}
 
 	log.Debug.Println("A: same records are no conflict")
+
 	return false
 }
 
@@ -315,6 +324,7 @@ func areDenyingAAAAs(this, that []*dns.AAAA) bool {
 	}
 
 	log.Debug.Println("AAAA: same records are no conflict")
+
 	return false
 }
 
@@ -338,8 +348,10 @@ func (a byAAAAIP) Less(i, j int) bool {
 func isDenyingSRV(this, that *dns.SRV) bool {
 	if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
 		log.Debug.Println("Same SRV")
+
 		if !isValidRR(this) {
 			log.Debug.Println("Invalid record produces conflict")
+
 			return true
 		}
 
@@ -391,6 +403,7 @@ func compareIP(this, that net.IP) int {
 	} else if len(this) > len(that) {
 		return 1
 	}
+
 	return 0
 }
 

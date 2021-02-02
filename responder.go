@@ -75,11 +75,13 @@ func newResponder(conn MDNSConn) *responder {
 func (r *responder) Remove(h ServiceHandle) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
 	for i, s := range r.managed {
 		if h == s {
 			handle := h.(*serviceHandle)
 			r.unannounce([]*Service{handle.service})
 			r.managed = append(r.managed[:i], r.managed[i+1:]...)
+
 			return
 		}
 	}
@@ -107,8 +109,10 @@ func (r *responder) Add(srv *Service) (ServiceHandle, error) {
 func (r *responder) Respond(ctx context.Context) error {
 	r.mutex.Lock()
 	r.isRunning = true
+
 	for _, h := range r.unmanaged {
 		log.Debug.Println(h.service)
+
 		srv, err := r.register(ctx, h.service)
 		if err != nil {
 			r.mutex.Unlock()
@@ -141,8 +145,7 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 		return
 	}
 
-	var answer []dns.RR
-	answer = append(answer, SRV(service), PTR(service), TXT(service))
+	answer := []dns.RR{SRV(service), PTR(service), TXT(service)}
 	for _, a := range A(service, iface) {
 		answer = append(answer, a)
 	}
@@ -161,6 +164,7 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	resp := &Response{msg: msg, iface: iface}
 
 	log.Debug.Println("Sending 1st announcement", msg)
+
 	if err := r.conn.SendResponse(resp); err != nil {
 		log.Debug.Printf("Failed to send 1st announcement: %s\n", err)
 	}
@@ -168,6 +172,7 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	time.Sleep(1 * time.Second)
 
 	log.Debug.Println("Sending 2nd announcement", msg)
+
 	if err := r.conn.SendResponse(resp); err != nil {
 		log.Debug.Printf("Failed to send 2nd announcement: %s\n", err)
 	}
@@ -179,6 +184,7 @@ func (r *responder) register(ctx context.Context, srv *Service) (*Service, error
 	}
 
 	log.Debug.Printf("Probing for host %s and service %s…\n", srv.Hostname(), srv.ServiceInstanceName())
+
 	probed, err := ProbeService(ctx, srv)
 	if err != nil {
 		return nil, err
@@ -188,6 +194,7 @@ func (r *responder) register(ctx context.Context, srv *Service) (*Service, error
 	for _, h := range r.managed {
 		srvs = append(srvs, h.service)
 	}
+
 	go r.announce(srvs)
 
 	return probed, nil
@@ -196,12 +203,14 @@ func (r *responder) register(ctx context.Context, srv *Service) (*Service, error
 func (r *responder) addManaged(srv *Service) ServiceHandle {
 	h := &serviceHandle{srv}
 	r.managed = append(r.managed, h)
+
 	return h
 }
 
 func (r *responder) addUnmanaged(srv *Service) ServiceHandle {
 	h := &serviceHandle{srv}
 	r.unmanaged = append(r.unmanaged, h)
+
 	return h
 }
 
@@ -212,6 +221,7 @@ func (r *responder) respond(ctx context.Context) error {
 
 	readCtx, readCancel := context.WithCancel(ctx)
 	defer readCancel()
+
 	ch := r.conn.Read(readCtx)
 
 	for {
@@ -225,6 +235,7 @@ func (r *responder) respond(ctx context.Context) error {
 			r.unannounce(services(r.managed))
 			r.conn.Close()
 			r.isRunning = false
+
 			return ctx.Err()
 		}
 	}
@@ -238,14 +249,17 @@ func (r *responder) handleRequest(req *Request) {
 
 	// If messages is truncated, we wait for the next message to come (RFC6762 18.5)
 	if req.msg.Truncated {
-		r.truncated = req
 		log.Debug.Println("Waiting for additional answers...")
+
+		r.truncated = req
+
 		return
 	}
 
 	// append request
 	if r.truncated != nil && r.truncated.from.IP.Equal(req.from.IP) {
 		log.Debug.Println("Add answers to truncated message")
+
 		msgs := []*dns.Msg{r.truncated.msg, req.msg}
 		r.truncated = nil
 		req.msg = mergeMsgs(msgs)
@@ -256,6 +270,7 @@ func (r *responder) handleRequest(req *Request) {
 	conflicts := findConflicts(req, r.managed)
 	for _, h := range conflicts {
 		log.Debug.Println("Reprobe for", h.service)
+
 		go r.reprobe(h)
 
 		for i, m := range r.managed {
@@ -278,14 +293,17 @@ func (r *responder) unannounce(services []*Service) {
 
 	// collect records per interface
 	rrsByIfaceName := map[string][]dns.RR{}
+
 	for _, srv := range services {
 		rr := PTR(srv)
 		rr.Header().Ttl = 0
+
 		for _, iface := range srv.Interfaces() {
 			ips := srv.IPsAtInterface(iface)
 			if len(ips) == 0 {
 				continue
 			}
+
 			if rrs, ok := rrsByIfaceName[iface.Name]; ok {
 				rrsByIfaceName[iface.Name] = append(rrs, rr)
 			} else {
@@ -306,6 +324,7 @@ func (r *responder) unannounce(services []*Service) {
 		msg.Answer = rrs
 		msg.Response = true
 		msg.Authoritative = true
+
 		resp := &Response{msg: msg, iface: iface}
 		if err := r.conn.SendResponse(resp); err != nil {
 			log.Debug.Printf("Failed to send 1st goodbye response: %s\n", err)
@@ -322,8 +341,10 @@ func (r *responder) unannounce(services []*Service) {
 func (r *responder) handleQuery(req *Request, services []*Service) {
 	for _, q := range req.msg.Question {
 		msgs := []*dns.Msg{}
+
 		for _, srv := range services {
 			log.Debug.Printf("%s tries to give response to question %v\n", srv.ServiceInstanceName(), q)
+
 			if msg := r.handleQuestion(q, req, srv); msg != nil {
 				msgs = append(msgs, msg)
 			} else {
@@ -345,6 +366,7 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 		if isUnicastQuestion(q) {
 			resp := &Response{msg: msg, addr: req.from, iface: req.iface}
 			log.Debug.Printf("Send unicast response\n%v to %v\n", msg, resp.addr)
+
 			if err := r.conn.SendResponse(resp); err != nil {
 				log.Debug.Println(err)
 			}
@@ -366,6 +388,7 @@ func (r *responder) reprobe(h *serviceHandle) {
 	if err != nil {
 		return
 	}
+
 	h.service = probed
 
 	r.mutex.Lock()
@@ -374,6 +397,7 @@ func (r *responder) reprobe(h *serviceHandle) {
 	r.mutex.Unlock()
 
 	log.Debug.Println("Reannouncing services", managed)
+
 	go r.announce(services(managed))
 }
 
@@ -467,9 +491,11 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv *Service) *
 
 func findConflicts(req *Request, hs []*serviceHandle) []*serviceHandle {
 	var conflicts []*serviceHandle
+
 	for _, h := range hs {
 		if containsConflictingAnswers(req, h) {
 			log.Debug.Println("Received conflicting record", req.msg)
+
 			conflicts = append(conflicts, h)
 		}
 	}
