@@ -1,0 +1,46 @@
+# options for analysis running
+run:
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  deadline: 5m
+
+# settings of specific linters
+linters-settings:
+  govet:
+    # report about shadowed variables
+    check-shadowing: true
+
+  lll:
+    # max line length, lines longer will be reported. Default is 120.
+    # '\t' is counted as 1 character by default, and can be changed with the tab-width option
+    line-length: 152
+
+  misspell:
+    # Correct spellings using locale preferences for US or UK.
+    # Default is to use a neutral variety of English.
+    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
+    locale: US
+
+  wsl:
+    # Allow declarations (var) to be cuddled.
+    allow-cuddle-declarations: true
+
+linters:
+  enable-all: true
+  disable:
+    - exhaustivestruct
+    - forbidigo
+    - gochecknoglobals
+    - gci
+    - goconst
+    - godot
+    - godox
+    - gomnd
+    - nlreturn
+    - paralleltest
+    - wrapcheck
+    - funlen #recommended
+    - gocognit #recommended
+    - gocyclo #recommended
+    - nestif #recommended
+    - testpackage #recommended
+  fast: true

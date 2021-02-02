@@ -1,16 +1,17 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"net"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 // ServiceHandle serves a middleman between a service and a responder.
 type ServiceHandle interface {
 	UpdateText(text map[string]string, r Responder)
-	Service() Service
+	Service() *Service
 }
 
 type serviceHandle struct {
@@ -21,7 +22,7 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 	h.service.Text = text
 
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{TXT(*h.service)}
+	msg.Answer = []dns.RR{TXT(h.service)}
 	msg.Response = true
 	msg.Authoritative = true
 
@@ -31,15 +32,21 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 
 	rr := r.(*responder)
 
-	rr.conn.SendResponse(resp)
+	if err := rr.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 1st update text response: %s\n", err)
+	}
+
 	time.Sleep(1 * time.Second)
-	rr.conn.SendResponse(resp)
+
+	if err := rr.conn.SendResponse(resp); err != nil {
+		log.Debug.Printf("Failed to send 2nd update text response: %s\n", err)
+	}
 
 	log.Debug.Println("Reannounce TXT", text)
 }
 
-func (h *serviceHandle) Service() Service {
-	return *h.service
+func (h *serviceHandle) Service() *Service {
+	return h.service
 }
 
 func (h *serviceHandle) IPv4s() []net.IP {

@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"context"
+
 	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 )
@@ -18,14 +19,15 @@ func LookupInstance(ctx context.Context, instance string) (Service, error) {
 	return lookupInstance(ctx, instance, conn)
 }
 
-func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Service, err error) {
-	var cache = NewCache()
+func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Service, error) {
+	cache := NewCache()
 
 	m := new(dns.Msg)
 
-	srvQ := dns.Question{instance, dns.TypeSRV, dns.ClassINET}
-	txtQ := dns.Question{instance, dns.TypeTXT, dns.ClassINET}
+	srvQ := dns.Question{Name: instance, Qtype: dns.TypeSRV, Qclass: dns.ClassINET}
 	setQuestionUnicast(&srvQ)
+
+	txtQ := dns.Question{Name: instance, Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 	setQuestionUnicast(&txtQ)
 
 	m.Question = []dns.Question{srvQ, txtQ}
@@ -34,8 +36,8 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 	defer readCancel()
 
 	ch := conn.Read(readCtx)
-
 	qs := make(chan *Query)
+
 	go func() {
 		for _, iface := range multicastInterfaces() {
 			q := &Query{msg: m, iface: iface}
@@ -51,15 +53,12 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 			}
 		case req := <-ch:
 			cache.UpdateFrom(req.msg, req.iface)
+
 			if s, ok := cache.services[instance]; ok {
-				srv = *s
-				return
+				return *s, nil
 			}
 		case <-ctx.Done():
-			err = ctx.Err()
-			return
+			return Service{}, ctx.Err()
 		}
 	}
-
-	return
 }

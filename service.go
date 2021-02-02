@@ -1,14 +1,17 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd/log"
 )
+
+var ErrInvalidConfig = errors.New("invalid config")
 
 type Config struct {
 	// Name of the service
@@ -39,19 +42,6 @@ type Config struct {
 	Ifaces []string
 }
 
-func (c Config) Copy() Config {
-	return Config{
-		Name:   c.Name,
-		Type:   c.Type,
-		Domain: c.Domain,
-		Host:   c.Host,
-		Text:   c.Text,
-		IPs:    c.IPs,
-		Port:   c.Port,
-		Ifaces: c.Ifaces,
-	}
-}
-
 // Service represents a DNS-SD service instance
 type Service struct {
 	Name   string
@@ -69,33 +59,30 @@ type Service struct {
 	expiration time.Time
 }
 
-func NewService(cfg Config) (s Service, err error) {
+func NewService(cfg *Config) (s *Service, err error) {
 	name := cfg.Name
 	typ := cfg.Type
 	port := cfg.Port
 
-	if len(name) == 0 {
-		err = fmt.Errorf("invalid name \"%s\"", name)
-		return
+	if name == "" {
+		return nil, fmt.Errorf("%w: name \"%s\"", ErrInvalidConfig, name)
 	}
 
-	if len(typ) == 0 {
-		err = fmt.Errorf("invalid type \"%s\"", typ)
-		return
+	if typ == "" {
+		return nil, fmt.Errorf("%w: type \"%s\"", ErrInvalidConfig, typ)
 	}
 
 	if port == 0 {
-		err = fmt.Errorf("invalid port \"%d\"", port)
-		return
+		return nil, fmt.Errorf("%w: port \"%d\"", ErrInvalidConfig, port)
 	}
 
 	domain := cfg.Domain
-	if len(domain) == 0 {
+	if domain == "" {
 		domain = "local"
 	}
 
 	host := cfg.Host
-	if len(host) == 0 {
+	if host == "" {
 		host = hostname()
 	}
 
@@ -105,17 +92,17 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	ips := []net.IP{}
-	var Ifaces []string
+	ifaces := []string{}
 
 	if cfg.IPs != nil && len(cfg.IPs) > 0 {
 		ips = cfg.IPs
 	}
 
 	if cfg.Ifaces != nil && len(cfg.Ifaces) > 0 {
-		Ifaces = cfg.Ifaces
+		ifaces = cfg.Ifaces
 	}
 
-	return Service{
+	return &Service{
 		Name:     name,
 		Type:     typ,
 		Domain:   domain,
@@ -123,7 +110,7 @@ func NewService(cfg Config) (s Service, err error) {
 		Text:     text,
 		Port:     port,
 		IPs:      ips,
-		Ifaces:   Ifaces,
+		Ifaces:   ifaces,
 		ifaceIPs: map[string][]net.IP{},
 	}, nil
 }
@@ -133,6 +120,7 @@ func NewService(cfg Config) (s Service, err error) {
 func (s *Service) Interfaces() []*net.Interface {
 	if len(s.Ifaces) > 0 {
 		ifis := []*net.Interface{}
+
 		for _, name := range s.Ifaces {
 			if ifi, err := net.InterfaceByName(name); err == nil {
 				ifis = append(ifis, ifi)
@@ -161,18 +149,21 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	}
 
 	ips := []net.IP{}
+
 	for _, addr := range addrs {
-		if ip, _, err := net.ParseCIDR(addr.String()); err == nil {
-			ips = append(ips, ip)
-		} else {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
 			log.Debug.Println(err)
+			continue
 		}
+
+		ips = append(ips, ip)
 	}
 
 	return ips
 }
 
-func (s Service) Copy() *Service {
+func (s *Service) Copy() *Service {
 	return &Service{
 		Name:       s.Name,
 		Type:       s.Type,
@@ -188,15 +179,15 @@ func (s Service) Copy() *Service {
 	}
 }
 
-func (s Service) ServiceInstanceName() string {
+func (s *Service) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", s.Name, s.Type, s.Domain)
 }
 
-func (s Service) ServiceName() string {
+func (s *Service) ServiceName() string {
 	return fmt.Sprintf("%s.%s.", s.Type, s.Domain)
 }
 
-func (s Service) Hostname() string {
+func (s *Service) Hostname() string {
 	return fmt.Sprintf("%s.%s.", s.Host, s.Domain)
 }
 
@@ -207,23 +198,25 @@ func (s *Service) SetHostname(hostname string) {
 	}
 }
 
-func (s Service) ServicesMetaQueryName() string {
+func (s *Service) ServicesMetaQueryName() string {
 	return fmt.Sprintf("_services._dns-sd._udp.%s.", s.Domain)
 }
 
 func (s *Service) addIP(ip net.IP, iface *net.Interface) {
 	s.IPs = append(s.IPs, ip)
+
 	if iface != nil {
-		ifaceIPs := []net.IP{ip}
-		if ips, ok := s.ifaceIPs[iface.Name]; ok {
-			ifaceIPs = append(ips, ip)
+		if _, ok := s.ifaceIPs[iface.Name]; !ok {
+			s.ifaceIPs[iface.Name] = []net.IP{}
 		}
-		s.ifaceIPs[iface.Name] = ifaceIPs
+
+		s.ifaceIPs[iface.Name] = append(s.ifaceIPs[iface.Name], ip)
 	}
 }
 
 func newService(instance string) *Service {
 	name, typ, domain := parseServiceInstanceName(instance)
+
 	return &Service{
 		Name:     name,
 		Type:     typ,
@@ -235,7 +228,7 @@ func newService(instance string) *Service {
 	}
 }
 
-func parseServiceInstanceName(str string) (name string, service string, domain string) {
+func parseServiceInstanceName(str string) (name, service, domain string) {
 	elems := strings.Split(str, ".")
 	if len(elems) > 0 {
 		name = elems[0]
@@ -261,14 +254,15 @@ func hostname() string {
 	}
 
 	name, _ := parseHostname(hostname)
+
 	return sanitizeHostname(name)
 }
 
 func sanitizeHostname(name string) string {
-	return strings.Replace(name, " ", "-", -1)
+	return strings.ReplaceAll(name, " ", "-")
 }
 
-func parseHostname(str string) (name string, domain string) {
+func parseHostname(str string) (name, domain string) {
 	elems := strings.Split(str, ".")
 	if len(elems) > 0 {
 		name = elems[0]
@@ -284,6 +278,7 @@ func parseHostname(str string) (name string, domain string) {
 // multicastInterfaces returns a list of all available multicast network interfaces.
 func multicastInterfaces() []*net.Interface {
 	var tmp []*net.Interface
+
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
@@ -304,6 +299,7 @@ func multicastInterfaces() []*net.Interface {
 		if err != nil {
 			continue
 		}
+
 		for _, addr := range addrs {
 			if _, _, err := net.ParseCIDR(addr.String()); err == nil {
 				tmp = append(tmp, &iface)
@@ -313,42 +309,4 @@ func multicastInterfaces() []*net.Interface {
 	}
 
 	return tmp
-}
-
-// addrsForInterface returns ipv4 and ipv6 addresses for a specific interface.
-func addrsForInterface(iface *net.Interface) ([]net.IP, []net.IP) {
-	var v4, v6, v6local []net.IP
-
-	addrs, _ := iface.Addrs()
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok {
-			if ipnet.IP.To4() != nil {
-				v4 = append(v4, ipnet.IP)
-			} else {
-				switch ip := ipnet.IP.To16(); ip != nil {
-				case ip.IsGlobalUnicast():
-					v6 = append(v6, ipnet.IP)
-				case ip.IsLinkLocalUnicast():
-					v6local = append(v6local, ipnet.IP)
-				}
-			}
-		}
-	}
-	if len(v6) == 0 {
-		v6 = v6local
-	}
-	return v4, v6
-}
-
-func intersection(a []net.IP, b []net.IP) []net.IP {
-	var is []net.IP
-	for _, ea := range a {
-		for _, eb := range b {
-			if ea.Equal(eb) {
-				is = append(is, ea)
-			}
-		}
-	}
-
-	return is
 }

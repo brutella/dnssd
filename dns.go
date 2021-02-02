@@ -2,13 +2,14 @@ package dnssd
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
 	"net"
 	"reflect"
 	"sort"
+
+	"github.com/miekg/dns"
 )
 
-func PTR(srv Service) *dns.PTR {
+func PTR(srv *Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServiceName(),
@@ -20,7 +21,8 @@ func PTR(srv Service) *dns.PTR {
 	}
 }
 
-func DNSSDServicesPTR(srv Service) *dns.PTR {
+// nolint:golint // name is as intended
+func DNSSDServicesPTR(srv *Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServicesMetaQueryName(),
@@ -32,7 +34,7 @@ func DNSSDServicesPTR(srv Service) *dns.PTR {
 	}
 }
 
-func SRV(srv Service) *dns.SRV {
+func SRV(srv *Service) *dns.SRV {
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServiceInstanceName(),
@@ -47,11 +49,12 @@ func SRV(srv Service) *dns.SRV {
 	}
 }
 
-func TXT(srv Service) *dns.TXT {
+func TXT(srv *Service) *dns.TXT {
 	keys := []string{}
-	for key, _ := range srv.Text {
+	for key := range srv.Text {
 		keys = append(keys, key)
 	}
+
 	sort.Strings(keys)
 
 	txts := []string{}
@@ -70,7 +73,7 @@ func TXT(srv Service) *dns.TXT {
 	}
 }
 
-func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
+func NSEC(rr dns.RR, srv *Service, iface *net.Interface) *dns.NSEC {
 	switch r := rr.(type) {
 	case *dns.PTR:
 		return &dns.NSEC{
@@ -85,10 +88,12 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 		}
 	case *dns.SRV:
 		types := []uint16{}
+
 		ips := srv.IPsAtInterface(iface)
 		if includesIPv4(ips) {
 			types = append(types, dns.TypeA)
 		}
+
 		if includesIPv6(ips) {
 			types = append(types, dns.TypeAAAA)
 		}
@@ -112,10 +117,10 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	return nil
 }
 
-func A(srv Service, iface *net.Interface) []*dns.A {
-	ips := srv.IPsAtInterface(iface)
-
+func A(srv *Service, iface *net.Interface) []*dns.A {
 	var as []*dns.A
+
+	ips := srv.IPsAtInterface(iface)
 	for _, ip := range ips {
 		if ip.To4() != nil {
 			a := &dns.A{
@@ -134,13 +139,13 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 	return as
 }
 
-func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
-	ips := srv.IPsAtInterface(iface)
-
+func AAAA(srv *Service, iface *net.Interface) []*dns.AAAA {
 	var aaaas []*dns.AAAA
+
+	ips := srv.IPsAtInterface(iface)
 	for _, ip := range ips {
 		if ip.To4() == nil && ip.To16() != nil {
-			aaaa := &dns.AAAA{
+			aaaas = append(aaaas, &dns.AAAA{
 				Hdr: dns.RR_Header{
 					Name:   srv.Hostname(),
 					Rrtype: dns.TypeAAAA,
@@ -148,8 +153,7 @@ func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
 					Ttl:    TTLHostname,
 				},
 				AAAA: ip,
-			}
-			aaaas = append(aaaas, aaaa)
+			})
 		}
 	}
 
@@ -172,6 +176,7 @@ func splitRecords(records []dns.RR) (as []*dns.A, aaaas []*dns.AAAA, srvs []*dns
 			srvs = append(srvs, rr)
 		}
 	}
+
 	return
 }
 
@@ -198,10 +203,12 @@ func includesIPv6(ips []net.IP) bool {
 }
 
 // Removes this from that.
-func remove(this []dns.RR, that []dns.RR) []dns.RR {
+func remove(this, that []dns.RR) []dns.RR {
 	var result []dns.RR
+
 	for _, thatRr := range that {
 		isUnknown := true
+
 		for _, thisRr := range this {
 			switch a := thisRr.(type) {
 			case *dns.PTR:
@@ -245,9 +252,11 @@ func mergeMsgs(msgs []*dns.Msg) *dns.Msg {
 		if msg.Answer != nil {
 			resp.Answer = append(resp.Answer, remove(resp.Answer, msg.Answer)...)
 		}
+
 		if msg.Ns != nil {
 			resp.Ns = append(resp.Ns, remove(resp.Ns, msg.Ns)...)
 		}
+
 		if msg.Extra != nil {
 			resp.Extra = append(resp.Extra, remove(resp.Extra, msg.Extra)...)
 		}

@@ -1,13 +1,12 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
-
 	"context"
 	"fmt"
 	"net"
-	_ "time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 type BrowseEntry struct {
@@ -18,31 +17,34 @@ type BrowseEntry struct {
 	Domain    string
 }
 
-type AddFunc func(BrowseEntry)
-type RmvFunc func(BrowseEntry)
+type (
+	AddFunc func(BrowseEntry)
+	RmvFunc func(BrowseEntry)
+)
 
 func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
 	conn, err := newMDNSConn()
 	if err != nil {
 		return err
 	}
+
 	defer conn.close()
 
 	return lookupType(ctx, service, conn, add, rmv)
 }
 
-func (e BrowseEntry) ServiceInstanceName() string {
+func (e *BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
 }
 
 func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {
-	var cache = NewCache()
+	cache := NewCache()
 
 	m := new(dns.Msg)
 	m.Question = []dns.Question{
-		dns.Question{service, dns.TypePTR, dns.ClassINET},
+		{Name: service, Qtype: dns.TypePTR, Qclass: dns.ClassINET},
 	}
-	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Supression)
+	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Suppression)
 	// m.Answer = ...
 	// m.Authoritive = false // because our answers are *believes*
 
@@ -50,8 +52,8 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	defer readCancel()
 
 	ch := conn.Read(readCtx)
-
 	qs := make(chan *Query)
+
 	go func() {
 		for _, iface := range multicastInterfaces() {
 			q := &Query{msg: m, iface: iface}
@@ -60,10 +62,12 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	}()
 
 	es := []*BrowseEntry{}
+
 	for {
 		select {
 		case q := <-qs:
 			log.Debug.Printf("Send browsing query at %s\n%s\n", q.iface.Name, q.msg)
+
 			if err := conn.SendQuery(q); err != nil {
 				log.Debug.Println("SendQuery:", err)
 			}
@@ -71,19 +75,22 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 		case req := <-ch:
 			log.Debug.Printf("Receive message at %s\n%s\n", req.iface.Name, req.msg)
 			cache.UpdateFrom(req.msg, req.iface)
+
 			for _, srv := range cache.Services() {
 				if srv.ServiceName() != service {
 					continue
 				}
 
 				for ifaceName, ips := range srv.ifaceIPs {
-					var found = false
+					found := false
+
 					for _, e := range es {
 						if e.Name == srv.Name && e.IfaceName == ifaceName {
 							found = true
 							break
 						}
 					}
+
 					if !found {
 						e := BrowseEntry{
 							IPs:       ips,
@@ -92,6 +99,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 							Type:      srv.Type,
 							Domain:    srv.Domain,
 						}
+
 						es = append(es, &e)
 						add(e)
 					}
@@ -99,8 +107,10 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 			}
 
 			tmp := []*BrowseEntry{}
+
 			for _, e := range es {
-				var found = false
+				found := false
+
 				for _, srv := range cache.Services() {
 					if srv.ServiceInstanceName() == e.ServiceInstanceName() {
 						found = true
@@ -115,6 +125,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 					rmv(*e)
 				}
 			}
+
 			es = tmp
 		case <-ctx.Done():
 			return ctx.Err()

@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -109,6 +110,7 @@ func (c *mdnsConn) Read(ctx context.Context) <-chan *Request {
 
 func (c *mdnsConn) Drain(ctx context.Context) {
 	log.Debug.Println("Draining connection")
+
 	for {
 		select {
 		case req := <-c.Read(ctx):
@@ -136,8 +138,11 @@ func newMDNSConn() (*mdnsConn, error) {
 		if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
 			log.Debug.Printf("IPv4 interface socket opt: %v", err)
 		}
+
 		// Enable multicast loopback to send and receive data from lo0
-		connIPv4.SetMulticastLoopback(true)
+		if err := connIPv4.SetMulticastLoopback(true); err != nil {
+			log.Debug.Printf("Failed to enable multicast loopback for IPv4: %v", err)
+		}
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
@@ -155,8 +160,11 @@ func newMDNSConn() (*mdnsConn, error) {
 		if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
 			log.Debug.Printf("IPv6 interface socket opt: %v", err)
 		}
+
 		// Enable multicast loopback to send and receive data from lo0
-		connIPv6.SetMulticastLoopback(true)
+		if err := connIPv6.SetMulticastLoopback(true); err != nil {
+			log.Debug.Printf("Failed to enable multicast loopback for IPv6: %v", err)
+		}
 
 		for _, iface := range multicastInterfaces() {
 			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
@@ -167,8 +175,9 @@ func newMDNSConn() (*mdnsConn, error) {
 		}
 	}
 
-	if err := first(errs...); connIPv4 == nil && connIPv6 == nil {
-		return nil, fmt.Errorf("Failed setting up UDP server: %v", err)
+	if connIPv4 == nil && connIPv6 == nil {
+		err := first(errs...)
+		return nil, fmt.Errorf("failed setting up UDP server: %w", err)
 	}
 
 	return &mdnsConn{
@@ -194,14 +203,14 @@ func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
 }
 
 func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
-
 	isDone := func(ctx context.Context) bool {
-		return ctx.Err() == context.Canceled
+		return errors.Is(ctx.Err(), context.Canceled)
 	}
 
 	if c.ipv4 != nil {
 		go func() {
 			buf := make([]byte, 65536)
+
 			for {
 				if isDone(ctx) {
 					return
@@ -239,6 +248,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 	if c.ipv6 != nil {
 		go func() {
 			buf := make([]byte, 65536)
+
 			for {
 				if isDone(ctx) {
 					return
@@ -316,6 +326,7 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
+
 			if _, err = c.ipv4.WriteTo(out, ctrl, addr); err != nil {
 				return err
 			}
@@ -330,6 +341,7 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
+
 			if _, err = c.ipv6.WriteTo(out, ctrl, addr); err != nil {
 				return err
 			}
@@ -354,21 +366,25 @@ func shouldIgnore(m *dns.Msg) bool {
 func sanitizeResponse(m *dns.Msg) {
 	if m.Question != nil && len(m.Question) > 0 {
 		log.Info.Println("Multicast DNS responses MUST NOT contain any questions in the Question Section.  (RFC6762 6)")
+
 		m.Question = nil
 	}
 
 	if !m.Response {
 		log.Info.Println("In response messages the QR bit MUST be one (RFC6762 18.2)")
+
 		m.Response = true
 	}
 
 	if !m.Authoritative {
 		log.Info.Println("AA Bit bit MUST be set to one in response messages (RFC6762 18.4)")
+
 		m.Authoritative = true
 	}
 
 	if m.Truncated {
 		log.Info.Println("In multicast response messages, the TC bit MUST be zero on transmission. (RFC6762 18.5)")
+
 		m.Truncated = false
 	}
 }
@@ -376,11 +392,13 @@ func sanitizeResponse(m *dns.Msg) {
 func sanitizeQuery(m *dns.Msg) {
 	if m.Response {
 		log.Info.Println("In query messages the QR bit MUST be zero (RFC6762 18.2)")
+
 		m.Response = false
 	}
 
 	if m.Authoritative {
 		log.Info.Println("AA Bit MUST be zero in query messages (RFC6762 18.4)")
+
 		m.Authoritative = false
 	}
 }
@@ -388,31 +406,37 @@ func sanitizeQuery(m *dns.Msg) {
 func sanitizeMsg(m *dns.Msg) {
 	if m.Opcode != 0 {
 		log.Info.Println("In both multicast query and multicast response messages, the OPCODE MUST be zero on transmission (RFC6762 18.3)")
+
 		m.Opcode = 0
 	}
 
 	if m.RecursionDesired {
 		log.Info.Println("In both multicast query and multicast response messages, the Recursion Available bit MUST be zero on transmission. (RFC6762 18.7)")
+
 		m.RecursionDesired = false
 	}
 
 	if m.Zero {
 		log.Info.Println("In both query and response messages, the Zero bit MUST be zero on transmission (RFC6762 18.8)")
+
 		m.Zero = false
 	}
 
 	if m.AuthenticatedData {
 		log.Info.Println("In both multicast query and multicast response messages, the Authentic Data bit MUST be zero on transmission (RFC6762 18.9)")
+
 		m.AuthenticatedData = false
 	}
 
 	if m.CheckingDisabled {
 		log.Info.Println("In both multicast query and multicast response messages, the Checking Disabled bit MUST be zero on transmission (RFC6762 18.10)")
+
 		m.CheckingDisabled = false
 	}
 
 	if m.Rcode != 0 {
 		log.Info.Println("In both multicast query and multicast response messages, the Response Code MUST be zero on transmission. (RFC6762 18.11)")
+
 		m.Rcode = 0
 	}
 }

@@ -76,12 +76,12 @@ func TestNewServiceWithMinimalConfig(t *testing.T) {
 		Port: 1234,
 	}
 
-	sv, err := NewService(cfg)
+	sv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(sv.Host) == 0 {
+	if sv.Host == "" {
 		t.Fatal("Expected hostname")
 	}
 
@@ -101,7 +101,8 @@ func TestNewServiceWithExplicitIP(t *testing.T) {
 		IPs:  []net.IP{net.ParseIP("127.0.0.1")},
 		Port: 1234,
 	}
-	sv, err := NewService(cfg)
+
+	sv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

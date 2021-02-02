@@ -1,12 +1,12 @@
 package dnssd
 
 import (
-	"github.com/miekg/dns"
-
 	"context"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 var testAddr = net.UDPAddr{
@@ -44,6 +44,7 @@ func (c *testConn) SendQuery(q *Query) error {
 	go func() {
 		c.out <- q.msg
 	}()
+
 	return nil
 }
 
@@ -57,6 +58,7 @@ func (c *testConn) SendResponse(resp *Response) error {
 
 func (c *testConn) Read(ctx context.Context) <-chan *Request {
 	go c.start(ctx)
+
 	return c.read
 }
 
@@ -82,11 +84,11 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
-	// log.Debug.Enable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
 	}
+
 	if testIface == nil {
 		t.Fatal("can not find the local interface")
 	}
@@ -105,30 +107,39 @@ func TestProbing(t *testing.T) {
 		Port:   12334,
 		Ifaces: []string{testIface.Name},
 	}
-	srv, err := NewService(cfg)
+
+	srv, err := NewService(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	srv.ifaceIPs = map[string][]net.IP{
-		testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
+		testIface.Name: {net.IP{192, 168, 0, 122}},
 	}
 
 	r := newResponder(otherConn)
+
 	go func() {
-		rcfg := cfg.Copy()
-		rsrv, err := NewService(rcfg)
-		if err != nil {
-			t.Fatal(err)
+		rcfg := cfg // shallow copy is implicit
+
+		rsrv, srvErr := NewService(&rcfg)
+		if srvErr != nil {
+			t.Error(srvErr)
+			return
 		}
+
 		rsrv.ifaceIPs = map[string][]net.IP{
-			testIface.Name: []net.IP{net.IP{192, 168, 0, 123}},
+			testIface.Name: {net.IP{192, 168, 0, 123}},
 		}
 
 		rctx, rcancel := context.WithCancel(ctx)
 		defer rcancel()
 
 		r.addManaged(rsrv)
-		r.Respond(rctx)
+
+		if resErr := r.Respond(rctx); resErr != nil {
+			t.Error(resErr)
+		}
 	}()
 
 	resolved, err := probeService(ctx, conn, srv, 500*time.Millisecond, true)
@@ -186,7 +197,7 @@ func TestDenyingAs(t *testing.T) {
 	}{
 		{
 			This: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -197,7 +208,7 @@ func TestDenyingAs(t *testing.T) {
 				},
 			},
 			That: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -211,7 +222,7 @@ func TestDenyingAs(t *testing.T) {
 		},
 		{
 			This: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
@@ -227,7 +238,7 @@ func TestDenyingAs(t *testing.T) {
 		{
 			This: []*dns.A{},
 			That: []*dns.A{
-				&dns.A{
+				{
 					Hdr: dns.RR_Header{
 						Name:   "MyPrinter.local.",
 						Rrtype: dns.TypeA,
