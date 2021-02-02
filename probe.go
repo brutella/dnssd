@@ -31,6 +31,7 @@ func ProbeService(ctx context.Context, srv *Service) (*Service, error) {
 	// When ready to send its Multicast DNS probe packet(s) the host should
 	// first wait for a short random delay time, uniformly distributed in
 	// the range 0-250 ms. (RFC6762 8.1)
+	// nolint:gosec // use of weak random is fine here
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	delay := time.Duration(r.Intn(250)) * time.Millisecond
 	log.Debug.Println("Probing delay", delay)

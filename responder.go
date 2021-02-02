@@ -60,8 +60,9 @@ func newResponder(conn MDNSConn) *responder {
 		unmanaged: []*serviceHandle{},
 		managed:   []*serviceHandle{},
 		mutex:     &sync.Mutex{},
-		random:    rand.New(rand.NewSource(time.Now().UnixNano())),
-		upIfaces:  []string{},
+		// nolint:gosec // use of weak random is fine here
+		random:   rand.New(rand.NewSource(time.Now().UnixNano())),
+		upIfaces: []string{},
 	}
 }
 

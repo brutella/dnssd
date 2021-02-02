@@ -21,6 +21,7 @@ func PTR(srv *Service) *dns.PTR {
 	}
 }
 
+// nolint:golint // name is as intended
 func DNSSDServicesPTR(srv *Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
