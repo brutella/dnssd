@@ -1,6 +1,8 @@
 package dnssd
 
 import (
+	"errors"
+
 	"github.com/brutella/dnssd/log"
 
 	"fmt"
@@ -9,6 +11,8 @@ import (
 	"strings"
 	"time"
 )
+
+var ErrInvalidConfig = errors.New("invalid config")
 
 type Config struct {
 	// Name of the service
@@ -62,18 +66,15 @@ func NewService(cfg *Config) (s *Service, err error) {
 	port := cfg.Port
 
 	if name == "" {
-		err = fmt.Errorf("invalid name \"%s\"", name)
-		return
+		return nil, fmt.Errorf("%w: name \"%s\"", ErrInvalidConfig, name)
 	}
 
 	if typ == "" {
-		err = fmt.Errorf("invalid type \"%s\"", typ)
-		return
+		return nil, fmt.Errorf("%w: type \"%s\"", ErrInvalidConfig, typ)
 	}
 
 	if port == 0 {
-		err = fmt.Errorf("invalid port \"%d\"", port)
-		return
+		return nil, fmt.Errorf("%w: port \"%d\"", ErrInvalidConfig, port)
 	}
 
 	domain := cfg.Domain

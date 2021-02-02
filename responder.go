@@ -2,7 +2,7 @@ package dnssd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math/rand"
 	"net"
 	"strings"
@@ -12,6 +12,12 @@ import (
 	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 )
+
+// ErrNotResponding is returned when the responder is not responding
+var ErrNotResponding = errors.New("cannot register service when responder is not responding")
+
+// ErrNotRunning is returned when the service is not running
+var ErrNotRunning = errors.New("isRunning should be true before calling respond()")
 
 type ReadFunc func(*Request)
 
@@ -169,7 +175,7 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 
 func (r *responder) register(ctx context.Context, srv *Service) (*Service, error) {
 	if !r.isRunning {
-		return srv, fmt.Errorf("cannot register service when responder is not responding")
+		return srv, ErrNotResponding
 	}
 
 	log.Debug.Printf("Probing for host %s and service %s…\n", srv.Hostname(), srv.ServiceInstanceName())
@@ -201,7 +207,7 @@ func (r *responder) addUnmanaged(srv *Service) ServiceHandle {
 
 func (r *responder) respond(ctx context.Context) error {
 	if !r.isRunning {
-		return fmt.Errorf("isRunning should be true before calling respond()")
+		return ErrNotRunning
 	}
 
 	readCtx, readCancel := context.WithCancel(ctx)
