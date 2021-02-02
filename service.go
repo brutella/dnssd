@@ -255,7 +255,7 @@ func hostname() string {
 }
 
 func sanitizeHostname(name string) string {
-	return strings.Replace(name, " ", "-", -1)
+	return strings.ReplaceAll(name, " ", "-")
 }
 
 func parseHostname(str string) (name, domain string) {

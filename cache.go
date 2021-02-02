@@ -29,7 +29,7 @@ func (c *Cache) Services() []*Service {
 
 // UpdateFrom updates the cache from resource records in msg.
 // TODO consider the cache-flush bit to make records as to be deleted in one second
-func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service, rmvs []*Service) {
+func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Service) {
 	answers := filterRecords(msg, nil)
 	sort.Sort(byType(answers))
 

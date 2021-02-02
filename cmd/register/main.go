@@ -76,9 +76,9 @@ func main() {
 
 	go func() {
 		time.Sleep(1 * time.Second)
-		handle, errAdd := resp.Add(srv)
-		if errAdd != nil {
-			fmt.Println(errAdd)
+		handle, addErr := resp.Add(srv)
+		if addErr != nil {
+			fmt.Println(addErr)
 			return
 		}
 

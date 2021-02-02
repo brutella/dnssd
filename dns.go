@@ -199,7 +199,7 @@ func includesIPv6(ips []net.IP) bool {
 }
 
 // Removes this from that.
-func remove(this []dns.RR, that []dns.RR) []dns.RR {
+func remove(this, that []dns.RR) []dns.RR {
 	var result []dns.RR
 	for _, thatRr := range that {
 		isUnknown := true

@@ -202,7 +202,6 @@ func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
 }
 
 func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
-
 	isDone := func(ctx context.Context) bool {
 		return errors.Is(ctx.Err(), context.Canceled)
 	}
