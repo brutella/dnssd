@@ -213,7 +213,7 @@ func probeQuery(service *Service, iface *net.Interface) *Query {
 	as := A(service, iface)
 	aaaas := AAAA(service, iface)
 
-	var authority = []dns.RR{srv}
+	authority := []dns.RR{srv}
 	for _, a := range as {
 		authority = append(authority, a)
 	}

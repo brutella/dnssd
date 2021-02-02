@@ -1,12 +1,12 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
-
 	"context"
 	"fmt"
 	"net"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 type BrowseEntry struct {
@@ -17,8 +17,10 @@ type BrowseEntry struct {
 	Domain    string
 }
 
-type AddFunc func(BrowseEntry)
-type RmvFunc func(BrowseEntry)
+type (
+	AddFunc func(BrowseEntry)
+	RmvFunc func(BrowseEntry)
+)
 
 func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
 	conn, err := newMDNSConn()
@@ -36,7 +38,7 @@ func (e *BrowseEntry) ServiceInstanceName() string {
 }
 
 func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {
-	var cache = NewCache()
+	cache := NewCache()
 
 	m := new(dns.Msg)
 	m.Question = []dns.Question{
@@ -80,7 +82,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 				}
 
 				for ifaceName, ips := range srv.ifaceIPs {
-					var found = false
+					found := false
 
 					for _, e := range es {
 						if e.Name == srv.Name && e.IfaceName == ifaceName {
@@ -107,7 +109,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 			tmp := []*BrowseEntry{}
 
 			for _, e := range es {
-				var found = false
+				found := false
 
 				for _, srv := range cache.Services() {
 					if srv.ServiceInstanceName() == e.ServiceInstanceName() {

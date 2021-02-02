@@ -134,7 +134,7 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds, rmvs []*Se
 func (c *Cache) removeExpired() []*Service {
 	var outdated []*Service
 
-	var services = c.services
+	services := c.services
 	for key, srv := range services {
 		if time.Now().After(srv.expiration) {
 			outdated = append(outdated, srv)

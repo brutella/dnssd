@@ -2,14 +2,13 @@ package dnssd
 
 import (
 	"errors"
-
-	"github.com/brutella/dnssd/log"
-
 	"fmt"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd/log"
 )
 
 var ErrInvalidConfig = errors.New("invalid config")

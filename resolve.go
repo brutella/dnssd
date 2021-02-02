@@ -20,7 +20,7 @@ func LookupInstance(ctx context.Context, instance string) (Service, error) {
 }
 
 func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (Service, error) {
-	var cache = NewCache()
+	cache := NewCache()
 
 	m := new(dns.Msg)
 

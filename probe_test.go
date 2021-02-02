@@ -1,12 +1,12 @@
 package dnssd
 
 import (
-	"github.com/miekg/dns"
-
 	"context"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 var testAddr = net.UDPAddr{

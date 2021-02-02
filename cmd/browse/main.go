@@ -14,10 +14,12 @@ import (
 	"github.com/brutella/dnssd/log"
 )
 
-var serviceFlag = flag.String("Type", "_asdf._tcp", "Service type")
-var domainFlag = flag.String("Domain", "local.", "Browsing domain")
-var verboseFlag = flag.Bool("Verbose", false, "Verbose logging")
-var timeFormat = "15:04:05.000"
+var (
+	serviceFlag = flag.String("Type", "_asdf._tcp", "Service type")
+	domainFlag  = flag.String("Domain", "local.", "Browsing domain")
+	verboseFlag = flag.Bool("Verbose", false, "Verbose logging")
+	timeFormat  = "15:04:05.000"
+)
 
 func main() {
 	flag.Parse()
