@@ -63,13 +63,13 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 	for {
 		select {
 		case q := <-qs:
-			log.Debug.Printf("Send browsing query at %s\n%s\n", q.iface.Name, q.msg)
+			log.Debug.Printf("Send browsing query at %s\n%s\n", q.IfaceName(), q.msg)
 			if err := conn.SendQuery(q); err != nil {
 				log.Debug.Println("SendQuery:", err)
 			}
 
 		case req := <-ch:
-			log.Debug.Printf("Receive message at %s\n%s\n", req.iface.Name, req.msg)
+			log.Debug.Printf("Receive message at %s\n%s\n", req.IfaceName(), req.msg)
 			cache.UpdateFrom(req.msg, req.iface)
 			for _, srv := range cache.Services() {
 				if srv.ServiceName() != service {

@@ -35,6 +35,16 @@ type Query struct {
 	iface *net.Interface // The network interface to which the message is sent
 }
 
+// IfaceName returns the name of the network interface where the request was received.
+// If the network interface is unknown, the string "?" is returned.
+func (q Query) IfaceName() string {
+	if q.iface != nil {
+		return q.iface.Name
+	}
+
+	return "?"
+}
+
 // Response is a mDNS response
 type Response struct {
 	msg   *dns.Msg       // The response message
