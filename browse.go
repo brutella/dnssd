@@ -12,6 +12,7 @@ import (
 
 type BrowseEntry struct {
 	IPs       []net.IP
+	Port      int
 	IfaceName string
 	Name      string
 	Type      string
@@ -88,6 +89,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 					if !found {
 						e := BrowseEntry{
 							IPs:       ips,
+							Port:      srv.Port,
 							IfaceName: ifaceName,
 							Name:      srv.Name,
 							Type:      srv.Type,
