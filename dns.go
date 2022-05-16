@@ -113,6 +113,10 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 }
 
 func A(srv Service, iface *net.Interface) []*dns.A {
+	if iface == nil {
+		return []*dns.A{}
+	}
+
 	ips := srv.IPsAtInterface(iface)
 
 	var as []*dns.A
@@ -135,6 +139,10 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 }
 
 func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
+	if iface == nil {
+		return []*dns.AAAA{}
+	}
+
 	ips := srv.IPsAtInterface(iface)
 
 	var aaaas []*dns.AAAA
