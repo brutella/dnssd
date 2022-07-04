@@ -3,13 +3,14 @@ package dnssd
 import (
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 // ProbeService probes for the hostname and service instance name of srv.
@@ -74,13 +75,13 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 
 		if conflict.hostname && (prevConflict.hostname || probeOnce) {
 			numHostConflicts++
-			candidate.Host = fmt.Sprintf("%s (%d)", srv.Host, numHostConflicts+1)
+			candidate.Host = fmt.Sprintf("%s %d", srv.Host, numHostConflicts+1)
 			conflict.hostname = false
 		}
 
 		if conflict.serviceName && (prevConflict.serviceName || probeOnce) {
 			numNameConflicts++
-			candidate.Name = fmt.Sprintf("%s (%d)", srv.Name, numNameConflicts+1)
+			candidate.Name = fmt.Sprintf("%s %d", srv.Name, numNameConflicts+1)
 			conflict.serviceName = false
 		}
 
