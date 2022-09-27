@@ -49,8 +49,7 @@ func main() {
 			}
 		}()
 
-		resp.Respond(ctx)
-		if err != nil {
+		if err := resp.Respond(ctx); err != nil {
 			fmt.Println(err)
 		}
 	}
