@@ -181,8 +181,6 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 			queryTime = time.After(delay)
 		}
 	}
-
-	return probeConflict{}, nil
 }
 
 func probeQuery(service Service, iface *net.Interface) *Query {
