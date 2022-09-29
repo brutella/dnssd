@@ -123,7 +123,6 @@ func (c *mdnsConn) Drain(ctx context.Context) {
 		select {
 		case req := <-c.Read(ctx):
 			log.Debug.Println("Ignoring msg from", req.from.IP)
-			break
 		default:
 			return
 		}

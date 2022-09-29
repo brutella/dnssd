@@ -113,7 +113,6 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service,
 			}
 		default:
 			// ignore
-			break
 		}
 	}
 

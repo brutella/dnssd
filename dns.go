@@ -106,7 +106,6 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 			}
 		}
 	default:
-		break
 	}
 
 	return nil

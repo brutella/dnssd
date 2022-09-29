@@ -244,13 +244,11 @@ func isDenyingA(this *dns.A, that *dns.A) bool {
 		switch compareIP(this.A.To4(), that.A.To4()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 
@@ -269,13 +267,11 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 		switch compareIP(this.AAAA.To16(), that.AAAA.To16()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 
@@ -351,13 +347,11 @@ func isDenyingSRV(this *dns.SRV, that *dns.SRV) bool {
 		switch compareSRV(this, that) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 
@@ -373,7 +367,6 @@ func isValidRR(rr dns.RR) bool {
 	case *dns.SRV:
 		return len(r.Target) > 0 && r.Port != 0
 	default:
-		break
 	}
 
 	return true

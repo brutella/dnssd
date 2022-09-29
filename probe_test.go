@@ -72,8 +72,6 @@ func (c *testConn) start(ctx context.Context) {
 			c.read <- req
 		case <-ctx.Done():
 			return
-		default:
-			break
 		}
 	}
 }
