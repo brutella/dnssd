@@ -63,6 +63,14 @@ func (r Request) String() string {
 	return fmt.Sprintf("%s@%s\n%v", r.from.IP, r.IfaceName(), r.msg)
 }
 
+func (r Request) Raw() *dns.Msg {
+	return r.msg
+}
+
+func (r Request) From() *net.UDPAddr {
+	return r.from
+}
+
 // IfaceName returns the name of the network interface where the request was received.
 // If the network interface is unknown, the string "?" is returned.
 func (r Request) IfaceName() string {
