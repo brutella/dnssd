@@ -44,7 +44,7 @@ type responder struct {
 }
 
 func NewResponder() (Responder, error) {
-	conn, err := newMDNSConn()
+	conn, err := newMDNSConn(nil)
 	if err != nil {
 		return nil, err
 	}

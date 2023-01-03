@@ -25,7 +25,7 @@ type AddFunc func(BrowseEntry)
 type RmvFunc func(BrowseEntry)
 
 func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
-	conn, err := newMDNSConn()
+	conn, err := newMDNSConn(nil)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 	qs := make(chan *Query)
 	go func() {
-		for _, iface := range multicastInterfaces() {
+		for _, iface := range multicastInterfaces(nil) {
 			iface := iface
 			q := &Query{msg: m, iface: iface}
 			qs <- q

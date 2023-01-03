@@ -16,7 +16,7 @@ import (
 // ProbeService probes for the hostname and service instance name of srv.
 // If err == nil, the returned service is verified to be unique on the local network.
 func ProbeService(ctx context.Context, srv Service) (Service, error) {
-	conn, err := newMDNSConn()
+	conn, err := newMDNSConn(srv.Ifaces)
 
 	if err != nil {
 		return srv, err
@@ -41,7 +41,7 @@ func ProbeService(ctx context.Context, srv Service) (Service, error) {
 }
 
 func ReprobeService(ctx context.Context, srv Service) (Service, error) {
-	conn, err := newMDNSConn()
+	conn, err := newMDNSConn(srv.Ifaces)
 
 	if err != nil {
 		return srv, err

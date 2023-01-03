@@ -142,7 +142,7 @@ func (s *Service) Interfaces() []*net.Interface {
 		return ifis
 	}
 
-	return multicastInterfaces()
+	return multicastInterfaces(nil)
 }
 
 // IPsAtInterface returns the ip address at a specific interface.
@@ -286,7 +286,7 @@ func parseHostname(str string) (name string, domain string) {
 }
 
 // multicastInterfaces returns a list of all available multicast network interfaces.
-func multicastInterfaces() []*net.Interface {
+func multicastInterfaces(filters []string) []*net.Interface {
 	var tmp []*net.Interface
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -300,6 +300,10 @@ func multicastInterfaces() []*net.Interface {
 		}
 
 		if (iface.Flags & net.FlagMulticast) == 0 {
+			continue
+		}
+
+		if !containsIfaces(iface.Name, filters) {
 			continue
 		}
 
@@ -317,6 +321,20 @@ func multicastInterfaces() []*net.Interface {
 	}
 
 	return tmp
+}
+
+func containsIfaces(iface string, filters []string) bool {
+	if filters == nil || len(filters) <= 0 {
+		return true
+	}
+
+	for _, ifn := range filters {
+		if ifn == iface {
+			return true
+		}
+	}
+
+	return false
 }
 
 // addrsForInterface returns ipv4 and ipv6 addresses for a specific interface.

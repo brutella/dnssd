@@ -37,7 +37,7 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 
 	qs := make(chan *Query)
 	go func() {
-		for _, iface := range multicastInterfaces() {
+		for _, iface := range multicastInterfaces(nil) {
 			iface := iface
 			q := &Query{msg: m, iface: iface}
 			qs <- q
