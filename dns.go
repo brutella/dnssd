@@ -2,10 +2,11 @@ package dnssd
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
 	"net"
 	"reflect"
 	"sort"
+
+	"github.com/miekg/dns"
 )
 
 func PTR(srv Service) *dns.PTR {
@@ -71,6 +72,10 @@ func TXT(srv Service) *dns.TXT {
 }
 
 func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
+	if iface != nil && !srv.IsVisibleAtInterface(iface.Name) {
+		return nil
+	}
+
 	switch r := rr.(type) {
 	case *dns.PTR:
 		return &dns.NSEC{
@@ -117,6 +122,10 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 		return []*dns.A{}
 	}
 
+	if !srv.IsVisibleAtInterface(iface.Name) {
+		return []*dns.A{}
+	}
+
 	ips := srv.IPsAtInterface(iface)
 
 	var as []*dns.A
@@ -140,6 +149,10 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 
 func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
 	if iface == nil {
+		return []*dns.AAAA{}
+	}
+
+	if !srv.IsVisibleAtInterface(iface.Name) {
 		return []*dns.AAAA{}
 	}
 

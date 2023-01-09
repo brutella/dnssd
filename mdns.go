@@ -98,7 +98,7 @@ type mdnsConn struct {
 }
 
 func NewMDNSConn() (MDNSConn, error) {
-	return newMDNSConn(nil)
+	return newMDNSConn()
 }
 
 func (c *mdnsConn) SendQuery(q *Query) error {
@@ -134,7 +134,7 @@ func (c *mdnsConn) Close() {
 	c.close()
 }
 
-func newMDNSConn(ifs []string) (*mdnsConn, error) {
+func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 	var errs []error
 	var connIPv4 *ipv4.PacketConn
 	var connIPv6 *ipv6.PacketConn
@@ -149,7 +149,7 @@ func newMDNSConn(ifs []string) (*mdnsConn, error) {
 		// Enable multicast loopback to send and receive data from lo0
 		connIPv4.SetMulticastLoopback(true)
 
-		for _, iface := range multicastInterfaces(ifs) {
+		for _, iface := range multicastInterfaces(ifs...) {
 			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv4 %v: %v", iface.Name, err)
 			} else {
@@ -168,7 +168,7 @@ func newMDNSConn(ifs []string) (*mdnsConn, error) {
 		// Enable multicast loopback to send and receive data from lo0
 		connIPv6.SetMulticastLoopback(true)
 
-		for _, iface := range multicastInterfaces(ifs) {
+		for _, iface := range multicastInterfaces(ifs...) {
 			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv6 %v: %v", iface.Name, err)
 			} else {

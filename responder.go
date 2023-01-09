@@ -3,13 +3,14 @@ package dnssd
 import (
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 type ReadFunc func(*Request)
@@ -44,7 +45,7 @@ type responder struct {
 }
 
 func NewResponder() (Responder, error) {
-	conn, err := newMDNSConn(nil)
+	conn, err := newMDNSConn()
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +371,10 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 			extra = append(extra, aaaa)
 		}
 
-		extra = append(extra, NSEC(ptr, srv, req.iface))
+		if nsec := NSEC(ptr, srv, req.iface); nsec != nil {
+			extra = append(extra)
+		}
+
 		resp.Extra = extra
 
 		// Wait 20-125 msec for shared resource responses
@@ -391,8 +395,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 			extra = append(extra, aaaa)
 		}
 
-		nsec := NSEC(SRV(srv), srv, req.iface)
-		if nsec != nil {
+		if nsec := NSEC(SRV(srv), srv, req.iface); nsec != nil {
 			extra = append(extra, nsec)
 		}
 
@@ -413,9 +416,8 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 		}
 
 		resp.Answer = answer
-		nsec := NSEC(SRV(srv), srv, req.iface)
 
-		if nsec != nil {
+		if nsec := NSEC(SRV(srv), srv, req.iface); nsec != nil {
 			resp.Extra = []dns.RR{nsec}
 		}
 
@@ -466,7 +468,7 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	aaaas := AAAA(*handle.service, req.iface)
 	srv := SRV(*handle.service)
 
-	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, handle.service))
+	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, req.iface, handle.service))
 
 	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)

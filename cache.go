@@ -30,7 +30,7 @@ func (c *Cache) Services() []*Service {
 // UpdateFrom updates the cache from resource records in msg.
 // TODO consider the cache-flush bit to make records as to be deleted in one second
 func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service, rmvs []*Service) {
-	answers := filterRecords(msg, nil)
+	answers := filterRecords(msg, iface, nil)
 	sort.Sort(byType(answers))
 
 	for _, answer := range answers {
@@ -154,7 +154,13 @@ func (a byType) Less(i, j int) bool {
 	return false
 }
 
-func filterRecords(m *dns.Msg, service *Service) []dns.RR {
+func filterRecords(m *dns.Msg, iface *net.Interface, service *Service) []dns.RR {
+	if iface != nil && service != nil && len(service.Ifaces) > 0 {
+		if !service.IsVisibleAtInterface(iface.Name) {
+			// Ignnore message if coming from a ignored interface.
+			return []dns.RR{}
+		}
+	}
 	var all []dns.RR
 	all = append(all, m.Answer...)
 	all = append(all, m.Ns...)
