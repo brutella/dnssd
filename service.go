@@ -146,6 +146,10 @@ func (s *Service) Interfaces() []*net.Interface {
 }
 
 func (s *Service) IsVisibleAtInterface(iface string) bool {
+	if len(s.Ifaces) == 0 {
+		return true
+	}
+
 	for _, name := range s.Ifaces {
 		if name == iface {
 			return true
