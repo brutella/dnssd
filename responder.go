@@ -299,7 +299,7 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 	for _, q := range req.msg.Question {
 		msgs := []*dns.Msg{}
 		for _, srv := range services {
-			log.Debug.Printf("%s tries to give response to question %v\n", srv.ServiceInstanceName(), q)
+			log.Debug.Printf("%s tries to give response to question %v @%s\n", srv.ServiceInstanceName(), q, req.IfaceName())
 			if msg := r.handleQuestion(q, req, *srv); msg != nil {
 				msgs = append(msgs, msg)
 			} else {
