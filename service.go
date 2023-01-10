@@ -105,14 +105,14 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	ips := []net.IP{}
-	var Ifaces []string
+	var ifaces []string
 
 	if cfg.IPs != nil && len(cfg.IPs) > 0 {
 		ips = cfg.IPs
 	}
 
 	if cfg.Ifaces != nil && len(cfg.Ifaces) > 0 {
-		Ifaces = cfg.Ifaces
+		ifaces = cfg.Ifaces
 	}
 
 	return Service{
@@ -123,7 +123,7 @@ func NewService(cfg Config) (s Service, err error) {
 		Text:     text,
 		Port:     port,
 		IPs:      ips,
-		Ifaces:   Ifaces,
+		Ifaces:   ifaces,
 		ifaceIPs: map[string][]net.IP{},
 	}, nil
 }
@@ -145,13 +145,15 @@ func (s *Service) Interfaces() []*net.Interface {
 	return multicastInterfaces()
 }
 
-func (s *Service) IsVisibleAtInterface(iface string) bool {
+// IsVisibleAtInterface returns true, if the service is published
+// at the network interface with name n.
+func (s *Service) IsVisibleAtInterface(n string) bool {
 	if len(s.Ifaces) == 0 {
 		return true
 	}
 
 	for _, name := range s.Ifaces {
-		if name == iface {
+		if name == n {
 			return true
 		}
 	}
