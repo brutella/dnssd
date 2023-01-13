@@ -301,7 +301,7 @@ func parseHostname(str string) (name string, domain string) {
 	return
 }
 
-// MulticastInterfaces returns a list of all available multicast network interfaces.
+// MulticastInterfaces returns a list of all active multicast network interfaces.
 func MulticastInterfaces(filters ...string) []*net.Interface {
 	var tmp []*net.Interface
 	ifaces, err := net.Interfaces()
