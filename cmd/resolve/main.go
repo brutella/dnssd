@@ -5,11 +5,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/brutella/dnssd"
 	"os"
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd"
 )
 
 var instanceFlag = flag.String("Name", "Service", "Service Name")
@@ -52,8 +53,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
-	select {
-	case <-stop:
-		cancel()
-	}
+	<-stop
+	cancel()
 }

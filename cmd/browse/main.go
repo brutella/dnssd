@@ -5,12 +5,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/brutella/dnssd"
-	"github.com/brutella/dnssd/log"
 	"os"
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd"
+	"github.com/brutella/dnssd/log"
 )
 
 var serviceFlag = flag.String("Type", "_asdf._tcp", "Service type")
@@ -51,8 +52,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
-	select {
-	case <-stop:
-		cancel()
-	}
+	<-stop
+	cancel()
 }

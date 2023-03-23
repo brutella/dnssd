@@ -50,7 +50,7 @@ func SRV(srv Service) *dns.SRV {
 
 func TXT(srv Service) *dns.TXT {
 	keys := []string{}
-	for key, _ := range srv.Text {
+	for key := range srv.Text {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)

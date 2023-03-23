@@ -147,7 +147,9 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 			log.Debug.Printf("IPv4 interface socket opt: %v", err)
 		}
 		// Enable multicast loopback to send and receive data from lo0
-		connIPv4.SetMulticastLoopback(true)
+		if err := connIPv4.SetMulticastLoopback(true); err != nil {
+			log.Debug.Println("IPv4 set multicast loopback:", err)
+		}
 
 		for _, iface := range MulticastInterfaces(ifs...) {
 			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
@@ -166,7 +168,9 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 			log.Debug.Printf("IPv6 interface socket opt: %v", err)
 		}
 		// Enable multicast loopback to send and receive data from lo0
-		connIPv6.SetMulticastLoopback(true)
+		if err := connIPv6.SetMulticastLoopback(true); err != nil {
+			log.Debug.Println("IPv6 set multicast loopback:", err)
+		}
 
 		for _, iface := range MulticastInterfaces(ifs...) {
 			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {

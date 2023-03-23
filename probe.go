@@ -37,7 +37,7 @@ func ProbeService(ctx context.Context, srv Service) (Service, error) {
 	log.Debug.Println("Probing delay", delay)
 	time.Sleep(delay)
 
-	return probeService(probeCtx, conn, srv, 1*time.Millisecond, false)
+	return probeService(probeCtx, conn, srv, 250*time.Millisecond, false)
 }
 
 func ReprobeService(ctx context.Context, srv Service) (Service, error) {
@@ -48,7 +48,7 @@ func ReprobeService(ctx context.Context, srv Service) (Service, error) {
 	}
 
 	defer conn.close()
-	return probeService(ctx, conn, srv, 1*time.Millisecond, true)
+	return probeService(ctx, conn, srv, 250*time.Millisecond, true)
 }
 
 func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Duration, probeOnce bool) (s Service, e error) {
@@ -93,8 +93,6 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 			// and then begins probing for this record again. (RFC6762 8.2)
 			log.Debug.Println("Increase wait time after receiving conflicting data")
 			delay = 1 * time.Second
-		} else {
-			delay = 250 * time.Millisecond
 		}
 
 		log.Debug.Println("Probing wait", delay)
@@ -173,7 +171,9 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 			queriesCount++
 			for _, q := range queries {
 				log.Debug.Println("Sending probe", q.msg)
-				conn.SendQuery(q)
+				if err := conn.SendQuery(q); err != nil {
+					log.Debug.Println("Sending probe err:", err)
+				}
 			}
 
 			delay := 250 * time.Millisecond
@@ -244,13 +244,11 @@ func isDenyingA(this *dns.A, that *dns.A) bool {
 		switch compareIP(this.A.To4(), that.A.To4()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 
@@ -269,13 +267,11 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 		switch compareIP(this.AAAA.To16(), that.AAAA.To16()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 
@@ -351,13 +347,11 @@ func isDenyingSRV(this *dns.SRV, that *dns.SRV) bool {
 		switch compareSRV(this, that) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
-			break
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
 		default:
 			log.Debug.Println("No conflict")
-			break
 		}
 	}
 

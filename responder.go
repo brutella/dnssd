@@ -150,10 +150,14 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	resp := &Response{msg: msg, iface: iface}
 
 	log.Debug.Println("Sending 1st announcement", msg)
-	r.conn.SendResponse(resp)
+	if err := r.conn.SendResponse(resp); err != nil {
+		log.Debug.Println(err)
+	}
 	time.Sleep(1 * time.Second)
 	log.Debug.Println("Sending 2nd announcement", msg)
-	r.conn.SendResponse(resp)
+	if err := r.conn.SendResponse(resp); err != nil {
+		log.Debug.Println(err)
+	}
 }
 
 func (r *responder) register(ctx context.Context, srv Service) (Service, error) {
@@ -289,9 +293,13 @@ func (r *responder) unannounce(services []*Service) {
 		msg.Response = true
 		msg.Authoritative = true
 		resp := &Response{msg: msg, iface: iface}
-		r.conn.SendResponse(resp)
+		if err := r.conn.SendResponse(resp); err != nil {
+			log.Debug.Println("1st goodbye:", err)
+		}
 		time.Sleep(250 * time.Millisecond)
-		r.conn.SendResponse(resp)
+		if err := r.conn.SendResponse(resp); err != nil {
+			log.Debug.Println("2nd goodbye:", err)
+		}
 	}
 }
 
@@ -372,7 +380,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 		}
 
 		if nsec := NSEC(ptr, srv, req.iface); nsec != nil {
-			extra = append(extra)
+			extra = append(extra, nsec)
 		}
 
 		resp.Extra = extra

@@ -34,9 +34,13 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 	for _, iface := range h.service.Interfaces() {
 		resp := &Response{msg: msg, iface: iface}
 		go func() {
-			rr.conn.SendResponse(resp)
+			if err := rr.conn.SendResponse(resp); err != nil {
+				log.Debug.Println("1st reannounce:", err)
+			}
 			time.Sleep(1 * time.Second)
-			rr.conn.SendResponse(resp)
+			if err := rr.conn.SendResponse(resp); err != nil {
+				log.Debug.Println("2nd reannounce:", err)
+			}
 		}()
 	}
 }

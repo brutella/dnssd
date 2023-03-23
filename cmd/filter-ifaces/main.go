@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/brutella/dnssd"
 	slog "log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/brutella/dnssd"
 )
 
 func main() {
@@ -24,10 +25,8 @@ func main() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt)
 
-		select {
-		case <-stop:
-			cancel()
-		}
+		<-stop
+		cancel()
 	}()
 
 	<-ctx.Done()
