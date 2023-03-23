@@ -152,12 +152,12 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 
 	log.Debug.Println("Sending 1st announcement", msg)
 	if err := r.conn.SendResponse(resp); err != nil {
-		log.Debug.Println(err)
+		log.Debug.Println("1st announcement:", err)
 	}
 	time.Sleep(1 * time.Second)
 	log.Debug.Println("Sending 2nd announcement", msg)
 	if err := r.conn.SendResponse(resp); err != nil {
-		log.Debug.Println(err)
+		log.Debug.Println("2nd announcement:", err)
 	}
 }
 
