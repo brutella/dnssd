@@ -118,6 +118,7 @@ func (r *responder) Respond(ctx context.Context) error {
 func (r *responder) announce(services []*Service) {
 	for _, service := range services {
 		for _, iface := range service.Interfaces() {
+			service, iface := service, iface
 			go r.announceAtInterface(service, iface)
 		}
 	}
