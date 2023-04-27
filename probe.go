@@ -367,7 +367,6 @@ func isValidRR(rr dns.RR) bool {
 	case *dns.SRV:
 		return len(r.Target) > 0 && r.Port != 0
 	default:
-		break
 	}
 
 	return true
