@@ -31,14 +31,23 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	}
 	defer conn.close()
 
-	return lookupType(ctx, service, conn, add, rmv)
+	return lookupType(ctx, service, conn, add, rmv, false)
+}
+func LookupTypeUnicast(ctx context.Context, service string, add AddServiceFunc, rmv RmvServiceFunc) (err error) {
+	conn, err := newMDNSConn()
+	if err != nil {
+		return err
+	}
+	defer conn.close()
+
+	return lookupType(ctx, service, conn, add, rmv, true)
 }
 
 func (e BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
 }
 
-func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {
+func lookupType(ctx context.Context, service string, conn MDNSConn, add AddServiceFunc, rmv RmvServiceFunc, unicast bool) (err error) {
 	var cache = NewCache()
 
 	m := new(dns.Msg)
@@ -67,6 +76,10 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 		}
 	}()
 
+	if unicast {
+		setQuestionUnicast(&m.Question[0])
+	}
+  
 	es := []*BrowseEntry{}
 	for {
 		select {
