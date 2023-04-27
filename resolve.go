@@ -2,6 +2,8 @@ package dnssd
 
 import (
 	"context"
+
+	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
 )
 
@@ -22,8 +24,16 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 
 	m := new(dns.Msg)
 
-	srvQ := dns.Question{instance, dns.TypeSRV, dns.ClassINET}
-	txtQ := dns.Question{instance, dns.TypeTXT, dns.ClassINET}
+	srvQ := dns.Question{
+		Name:   instance,
+		Qtype:  dns.TypeSRV,
+		Qclass: dns.ClassINET,
+	}
+	txtQ := dns.Question{
+		Name:   instance,
+		Qtype:  dns.TypeTXT,
+		Qclass: dns.ClassINET,
+	}
 	setQuestionUnicast(&srvQ)
 	setQuestionUnicast(&txtQ)
 
@@ -34,14 +44,24 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 
 	ch := conn.Read(readCtx)
 
-	q := &Query{msg: m}
-	conn.SendQuery(q)
+	qs := make(chan *Query)
+	go func() {
+		for _, iface := range MulticastInterfaces() {
+			iface := iface
+			q := &Query{msg: m, iface: iface}
+			qs <- q
+		}
+	}()
 
 	for {
 		select {
+		case q := <-qs:
+			if err := conn.SendQuery(q); err != nil {
+				log.Info.Println(err)
+			}
 		case req := <-ch:
-			cache.UpdateFrom(req.msg)
-			if s, ok := cache.services[instance]; ok && s.IPs != nil && len(s.IPs) > 0 {
+			cache.UpdateFrom(req.msg, req.iface)
+			if s, ok := cache.services[instance]; ok {
 				srv = *s
 				return
 			}
@@ -50,6 +70,4 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 			return
 		}
 	}
-
-	return
 }

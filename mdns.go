@@ -35,6 +35,16 @@ type Query struct {
 	iface *net.Interface // The network interface to which the message is sent
 }
 
+// IfaceName returns the name of the network interface where the request was received.
+// If the network interface is unknown, the string "?" is returned.
+func (q Query) IfaceName() string {
+	if q.iface != nil {
+		return q.iface.Name
+	}
+
+	return "?"
+}
+
 // Response is a mDNS response
 type Response struct {
 	msg   *dns.Msg       // The response message
@@ -50,7 +60,25 @@ type Request struct {
 }
 
 func (r Request) String() string {
-	return fmt.Sprintf("%s@%s\n%v", r.from.IP, r.iface.Name, r.msg)
+	return fmt.Sprintf("%s@%s\n%v", r.from.IP, r.IfaceName(), r.msg)
+}
+
+func (r Request) Raw() *dns.Msg {
+	return r.msg
+}
+
+func (r Request) From() *net.UDPAddr {
+	return r.from
+}
+
+// IfaceName returns the name of the network interface where the request was received.
+// If the network interface is unknown, the string "?" is returned.
+func (r Request) IfaceName() string {
+	if r.iface != nil {
+		return r.iface.Name
+	}
+
+	return "?"
 }
 
 // MDNSConn represents a mDNS connection. It encapsulates an IPv4 and IPv6 UDP connection.
@@ -103,7 +131,6 @@ func (c *mdnsConn) Drain(ctx context.Context) {
 		select {
 		case req := <-c.Read(ctx):
 			log.Debug.Println("Ignoring msg from", req.from.IP)
-			break
 		default:
 			return
 		}
@@ -114,7 +141,7 @@ func (c *mdnsConn) Close() {
 	c.close()
 }
 
-func newMDNSConn() (*mdnsConn, error) {
+func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 	var errs []error
 	var connIPv4 *ipv4.PacketConn
 	var connIPv6 *ipv6.PacketConn
@@ -123,12 +150,16 @@ func newMDNSConn() (*mdnsConn, error) {
 		errs = append(errs, err)
 	} else {
 		connIPv4 = ipv4.NewPacketConn(conn)
-		connIPv4.SetControlMessage(ipv4.FlagInterface, true)
-		// Don't send us our own messages back
-		connIPv4.SetMulticastLoopback(false)
+		if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
+			log.Debug.Printf("IPv4 interface socket opt: %v", err)
+		}
+		// Enable multicast loopback to send and receive data from lo0
+		if err := connIPv4.SetMulticastLoopback(true); err != nil {
+			log.Debug.Println("IPv4 set multicast loopback:", err)
+		}
 
-		for _, iface := range multicastInterfaces() {
-			if err := connIPv4.JoinGroup(&iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
+		for _, iface := range MulticastInterfaces(ifs...) {
+			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv4 %v: %v", iface.Name, err)
 			} else {
 				log.Debug.Printf("Joined IPv4 %v", iface.Name)
@@ -140,12 +171,16 @@ func newMDNSConn() (*mdnsConn, error) {
 		errs = append(errs, err)
 	} else {
 		connIPv6 = ipv6.NewPacketConn(conn)
-		connIPv6.SetControlMessage(ipv6.FlagInterface, true)
-		// Don't send us our own messages back
-		connIPv6.SetMulticastLoopback(false)
+		if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
+			log.Debug.Printf("IPv6 interface socket opt: %v", err)
+		}
+		// Enable multicast loopback to send and receive data from lo0
+		if err := connIPv6.SetMulticastLoopback(true); err != nil {
+			log.Debug.Println("IPv6 set multicast loopback:", err)
+		}
 
-		for _, iface := range multicastInterfaces() {
-			if err := connIPv6.JoinGroup(&iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
+		for _, iface := range MulticastInterfaces(ifs...) {
+			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
 				log.Debug.Printf("Failed joining IPv6 %v: %v", iface.Name, err)
 			} else {
 				log.Debug.Printf("Joined IPv6 %v", iface.Name)
@@ -294,28 +329,35 @@ func (c *mdnsConn) writeMsg(m *dns.Msg, iface *net.Interface) error {
 func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAddr) error {
 	sanitizeMsg(m)
 
-	var err error
 	if c.ipv4 != nil && addr.IP.To4() != nil {
 		if out, err := m.Pack(); err == nil {
-			ctrl := &ipv4.ControlMessage{}
+			var ctrl *ipv4.ControlMessage
 			if iface != nil {
-				ctrl.IfIndex = iface.Index
+				ctrl = &ipv4.ControlMessage{
+					IfIndex: iface.Index,
+				}
 			}
-			_, err = c.ipv4.WriteTo(out, ctrl, addr)
+			if _, err = c.ipv4.WriteTo(out, ctrl, addr); err != nil {
+				return err
+			}
 		}
 	}
 
 	if c.ipv6 != nil && addr.IP.To4() == nil {
 		if out, err := m.Pack(); err == nil {
-			ctrl := &ipv6.ControlMessage{}
+			var ctrl *ipv6.ControlMessage
 			if iface != nil {
-				ctrl.IfIndex = iface.Index
+				ctrl = &ipv6.ControlMessage{
+					IfIndex: iface.Index,
+				}
 			}
-			_, err = c.ipv6.WriteTo(out, ctrl, addr)
+			if _, err = c.ipv6.WriteTo(out, ctrl, addr); err != nil {
+				return err
+			}
 		}
 	}
 
-	return err
+	return nil
 }
 
 func shouldIgnore(m *dns.Msg) bool {

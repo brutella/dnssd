@@ -1,10 +1,11 @@
 package dnssd
 
 import (
-	"github.com/brutella/dnssd/log"
-	"github.com/miekg/dns"
 	"net"
 	"time"
+
+	"github.com/brutella/dnssd/log"
+	"github.com/miekg/dns"
 )
 
 // ServiceHandle serves a middleman between a service and a responder.
@@ -27,15 +28,21 @@ func (h *serviceHandle) UpdateText(text map[string]string, r Responder) {
 
 	setAnswerCacheFlushBit(msg)
 
-	resp := &Response{msg: msg}
+	log.Debug.Println("Reannounce TXT", text)
 
 	rr := r.(*responder)
-
-	rr.conn.SendResponse(resp)
-	time.Sleep(1 * time.Second)
-	rr.conn.SendResponse(resp)
-
-	log.Debug.Println("Reannounce TXT", text)
+	for _, iface := range h.service.Interfaces() {
+		resp := &Response{msg: msg, iface: iface}
+		go func() {
+			if err := rr.conn.SendResponse(resp); err != nil {
+				log.Debug.Println("1st reannounce:", err)
+			}
+			time.Sleep(1 * time.Second)
+			if err := rr.conn.SendResponse(resp); err != nil {
+				log.Debug.Println("2nd reannounce:", err)
+			}
+		}()
+	}
 }
 
 func (h *serviceHandle) Service() Service {

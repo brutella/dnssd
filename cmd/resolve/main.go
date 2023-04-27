@@ -5,11 +5,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/brutella/dnssd"
 	"os"
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/brutella/dnssd"
 )
 
 var instanceFlag = flag.String("Name", "Service", "Service Name")
@@ -31,20 +32,20 @@ func main() {
 	fmt.Printf("DATE: –––%s–––\n", time.Now().Format("Mon Jan 2 2006"))
 	fmt.Printf("%s	...STARTING...\n", time.Now().Format(timeFormat))
 
-	addFn := func(srv dnssd.Service) {
-		if srv.ServiceInstanceName() == instance {
+	addFn := func(e dnssd.BrowseEntry) {
+		if e.ServiceInstanceName() == instance {
 			text := ""
-			for key, value := range srv.Text {
+			for key, value := range e.Text {
 				text += fmt.Sprintf("%s=%s", key, value)
 			}
-			fmt.Printf("%s	%s can be reached at %s:%d\n	%v\n", time.Now().Format(timeFormat), srv.ServiceInstanceName(), srv.Hostname(), srv.Port, text)
+			fmt.Printf("%s	%s can be reached at %s %v\n", time.Now().Format(timeFormat), e.ServiceInstanceName(), e.IPs, text)
 		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := dnssd.LookupType(ctx, service, addFn, func(dnssd.Service) {}); err != nil {
+	if err := dnssd.LookupType(ctx, service, addFn, func(dnssd.BrowseEntry) {}); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -52,8 +53,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
-	select {
-	case <-stop:
-		cancel()
-	}
+	<-stop
+	cancel()
 }

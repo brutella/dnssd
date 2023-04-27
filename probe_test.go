@@ -1,8 +1,9 @@
 package dnssd
 
 import (
-	"context"
 	"github.com/miekg/dns"
+
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -71,8 +72,6 @@ func (c *testConn) start(ctx context.Context) {
 			c.read <- req
 		case <-ctx.Done():
 			return
-		default:
-			break
 		}
 	}
 }
@@ -81,6 +80,7 @@ func (c *testConn) start(ctx context.Context) {
 // service instance name and host name.Once the first services
 // is announced, the probing for the second service should give
 func TestProbing(t *testing.T) {
+	// log.Debug.Enable()
 	testIface, _ = net.InterfaceByName("lo0")
 	if testIface == nil {
 		testIface, _ = net.InterfaceByName("lo")
@@ -89,8 +89,7 @@ func TestProbing(t *testing.T) {
 		t.Fatal("can not find the local interface")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	conn := newTestConn()
 	otherConn := newTestConn()
@@ -98,56 +97,53 @@ func TestProbing(t *testing.T) {
 	conn.out = otherConn.in
 
 	cfg := Config{
-		Name: "My Service",
-		Type: "_hap._tcp",
-		Host: "My-Computer",
-		Port: 12334,
-		ifaceIPs: map[string][]net.IP{
-			testIface.Name: []net.IP{net.ParseIP("192.168.0.122")},
-		},
+		Name:   "My Service",
+		Type:   "_hap._tcp",
+		Host:   "My-Computer",
+		Port:   12334,
+		Ifaces: []string{testIface.Name},
 	}
 	srv, err := NewService(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.ifaceIPs = map[string][]net.IP{
+		testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
+	}
 
+	r := newResponder(otherConn)
 	go func() {
-		otherCfg := cfg.Copy()
-		otherCfg.IPs = []net.IP{net.ParseIP("192.168.0.123")}
-		otherCfg.ifaceIPs = nil
-		otherSrv, otherErr := NewService(otherCfg)
-		if otherErr != nil {
-			t.Fatal(otherErr)
+		rcfg := cfg.Copy()
+		rsrv, err := NewService(rcfg)
+		if err != nil {
+			t.Fatal(err)
 		}
-		otherResp := newResponder(otherConn)
-		otherResp.Add(otherSrv)
+		rsrv.ifaceIPs = map[string][]net.IP{
+			testIface.Name: []net.IP{net.IP{192, 168, 0, 123}},
+		}
 
-		otherCtx, otherCancel := context.WithCancel(ctx)
-		defer otherCancel()
+		rctx, rcancel := context.WithCancel(ctx)
+		defer rcancel()
 
-		// the responder won't probe for the service instance name and host name
-		// because we explicitely set the IP address.
-		otherResp.Respond(otherCtx)
+		r.addManaged(rsrv)
+		r.Respond(rctx)
 	}()
 
-	// Wait until second service was announced.
-	// This doesn't take long because we set the IP address
-	// explicitely. Therefore no probing is done.
-	<-time.After(500 * time.Millisecond)
-
-	resolved, err := probeService(ctx, conn, srv, 1*time.Second, true)
+	resolved, err := probeService(ctx, conn, srv, 500*time.Millisecond, true)
 
 	if x := err; x != nil {
 		t.Fatal(x)
 	}
 
-	if is, want := resolved.Host, "My-Computer-2"; is != want {
+	if is, want := resolved.Host, "My-Computer 2"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 
-	if is, want := resolved.Name, "My Service-2"; is != want {
+	if is, want := resolved.Name, "My Service 2"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
+
+	cancel()
 }
 
 func TestIsLexicographicLater(t *testing.T) {
@@ -177,5 +173,80 @@ func TestIsLexicographicLater(t *testing.T) {
 
 	if is, want := compareIP(that.A.To4(), this.A.To4()), 1; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
+	}
+}
+
+func TestDenyingAs(t *testing.T) {
+	tests := []struct {
+		This   []*dns.A
+		That   []*dns.A
+		Result bool
+	}{
+		{
+			This: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			That: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			Result: false,
+		},
+		{
+			This: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			That:   []*dns.A{},
+			Result: true,
+		},
+		{
+			This: []*dns.A{},
+			That: []*dns.A{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "MyPrinter.local.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    TTLHostname,
+					},
+					A: net.ParseIP("169.254.99.200"),
+				},
+			},
+			Result: true,
+		},
+		{
+			This:   []*dns.A{},
+			That:   []*dns.A{},
+			Result: false,
+		},
+	}
+
+	for _, test := range tests {
+		if is, want := areDenyingAs(test.This, test.That), test.Result; is != want {
+			t.Fatalf("%v != %v is=%v want=%v", test.This, test.That, is, want)
+		}
 	}
 }
