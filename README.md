@@ -75,6 +75,7 @@ You can install the tool with
 ### Usage
 
 **Registering a service on your local machine**
+
 Lets register a printer service (`_printer._tcp`) running on your local computer at port 515 with the name "Private Printer".
 
 ```sh
