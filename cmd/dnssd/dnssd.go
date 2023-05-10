@@ -169,8 +169,6 @@ func browse(typee string) {
 }
 
 func main() {
-
-	println(os.Args)
 	args := os.Args[1:]
 	if len(args) == 0 {
 		printUsage()
