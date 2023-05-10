@@ -63,9 +63,55 @@ Once a service is added to a responder, you can use the `hdl` to update properti
 hdl.UpdateText(map[string]string{"key1": "value1", "key2": "value2"}, rsp)
 ```
 
-## Examples
+## `dnssd` cli
 
-There are examples in the `_cmd` directory to register services, resolve service instances and to browse for service types.
+The command line tool in `cmd/dnssd` lets you browse, register and resolve services similar to [dns-sd](https://www.unix.com/man-page/osx/1/dns-sd/).
+
+### Install
+You can install the tool with
+
+`go install github.com/brutella/dnssd/cmd/dnssd`
+
+### Usage
+
+**Registering a service on your local machine**
+Lets register a printer service (`_printer._tcp`) running on your local computer at port 515 with the name "Private Printer".
+
+```sh
+dnssd register -Name="Private Printer" -Type="_printer._tcp" -Port=515
+```
+
+**Registering a proxy service**
+
+If the service is running on a different machine on your local network, you have to specify the hostname and IP.
+Lets say the printer service is running on the printer with the hostname `ABCD` and IPv4 address `192.168.1.53`, you can register a proxy which announce that service on your network.
+
+```sh
+dnssd register -Name="Private Printer" -Type="_printer._tcp" -Port=515 -IP=192.168.1.53 -Host=ABCD
+```
+
+Use option `-Interface`, if you want to announce the service only on a specific network interface.
+This might be necessary if your local machine is connected to multiple subnets and your announced service is only available on a specific subnet.
+
+```sh
+dnssd register -Name="Private Printer" -Type="_printer._tcp" -Port=515 -IP=192.168.1.53 -Host=ABCD -Interface=en0
+```
+
+**Browsing for a service**
+
+If you want to browse for a service type, you can use the `browse` command.
+
+```sh
+dnssd browse -Type="_printer._tcp"
+```
+
+**Resolving a service instance**
+
+If you know the name of a service instance, you can resolve its hostname with the `resolve` command.
+
+```sh
+dnssd resolve -Name="Private Printer" -Type="_printer._tcp"
+```
 
 ## Conformance
 
