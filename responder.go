@@ -87,7 +87,8 @@ func (r *responder) Add(srv Service) (ServiceHandle, error) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
-		if srv, err := r.register(ctx, srv); err != nil {
+		srv, err := r.register(ctx, srv)
+		if err != nil {
 			return nil, err
 		}
 
@@ -102,7 +103,8 @@ func (r *responder) Respond(ctx context.Context) error {
 	r.isRunning = true
 	for _, h := range r.unmanaged {
 		log.Debug.Println(h.service)
-		if srv, err := r.register(ctx, *h.service); err != nil {
+		srv, err := r.register(ctx, *h.service)
+		if err != nil {
 			return err
 		}
 
