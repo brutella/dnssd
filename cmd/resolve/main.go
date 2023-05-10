@@ -38,7 +38,7 @@ func main() {
 			for key, value := range e.Text {
 				text += fmt.Sprintf("%s=%s", key, value)
 			}
-			fmt.Printf("%s	%s can be reached at %s %v\n", time.Now().Format(timeFormat), e.ServiceInstanceName(), e.IPs, text)
+			fmt.Printf("%s	%s can be reached at %s %v\n", time.Now().Format(timeFormat), e.UnescapedServiceInstanceName(), e.IPs, text)
 		}
 	}
 

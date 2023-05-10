@@ -1,6 +1,8 @@
 package dnssd
 
 import (
+	"bytes"
+
 	"github.com/brutella/dnssd/log"
 
 	"fmt"
@@ -11,7 +13,7 @@ import (
 )
 
 type Config struct {
-	// Name of the service
+	// Name of the service.
 	Name string
 
 	// Type is the service type, for example "_hap._tcp".
@@ -69,8 +71,11 @@ type Service struct {
 	expiration time.Time
 }
 
+// NewService returns a new service for the given config.
 func NewService(cfg Config) (s Service, err error) {
-	name := cfg.Name
+	// Escape dots in the name (RFC6763 4.3).
+	// Spaces and backslashes are escaped by "github.com/miekg/dns".
+	name := strings.Replace(cfg.Name, ".", "\\.", -1)
 	typ := cfg.Type
 	port := cfg.Port
 
@@ -192,6 +197,7 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	return ips
 }
 
+// Copy returns a copy of the service.
 func (s Service) Copy() *Service {
 	return &Service{
 		Name:       s.Name,
@@ -208,25 +214,53 @@ func (s Service) Copy() *Service {
 	}
 }
 
+// ServiceInstanceName returns the service instance name
+// in the form of <instance name>.<service>.<domain>.
+// (Note the trailing dot.)
 func (s Service) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", s.Name, s.Type, s.Domain)
 }
 
+// UnescapedServiceInstanceName returns the same as `ServiceInstanceName()`
+// but removes any escape characters.
+func (s Service) UnescapedServiceInstanceName() string {
+	return fmt.Sprintf("%s.%s.%s.", s.UnescapedName(), s.Type, s.Domain)
+}
+
+// UnescapedName returns the unescaped instance name.
+func (s Service) UnescapedName() string {
+	return unquote.Replace(s.Name)
+}
+
+// ServiceName returns the service name in the
+// form of "<service>.<domain>."
+// (Note the trailing dot.)
 func (s Service) ServiceName() string {
 	return fmt.Sprintf("%s.%s.", s.Type, s.Domain)
 }
+
+// Hostname returns the hostname in the
+// form of "<hostname>.<domain>."
+// (Note the trailing dot.)
 
 func (s Service) Hostname() string {
 	return fmt.Sprintf("%s.%s.", s.Host, s.Domain)
 }
 
+// SetHostname sets the service's host name and
+// domain (if specified as "<hostname>.<domain>.").
+// (Note the trailing dot.)
 func (s *Service) SetHostname(hostname string) {
 	name, domain := parseHostname(hostname)
+
 	if domain == s.Domain {
 		s.Host = name
 	}
 }
 
+// ServicesMetaQueryName returns the name of the meta query
+// for the service domain in the form of "_services._dns-sd._udp.<domain.".
+// (Note the trailing dot.)
 func (s Service) ServicesMetaQueryName() string {
 	return fmt.Sprintf("_services._dns-sd._udp.%s.", s.Domain)
 }
@@ -255,19 +289,36 @@ func newService(instance string) *Service {
 	}
 }
 
+var unquote = strings.NewReplacer("\\", "")
+
+func reverse(s string) string {
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < len(r)/2; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r)
+}
+
+// parseServiceInstanceName parses str to get the instance, service and domain name.
 func parseServiceInstanceName(str string) (name string, service string, domain string) {
-	elems := strings.Split(str, ".")
-	if len(elems) > 0 {
-		name = elems[0]
+	r := bytes.NewBufferString(reverse(strings.Trim(str, ".")))
+	l, err := r.ReadString('.')
+	if err != nil {
+		return
 	}
+	domain = strings.Trim(l, ".")
+	domain = reverse(domain)
 
-	if len(elems) > 2 {
-		service = fmt.Sprintf("%s.%s", elems[1], elems[2])
+	proto, err := r.ReadString('.')
+	if err != nil {
+		return
 	}
-
-	if len(elems) > 3 {
-		domain = elems[3]
+	typee, err := r.ReadString('.')
+	if err != nil {
+		return
 	}
+	service = fmt.Sprintf("%s.%s", strings.Trim(reverse(typee), "."), strings.Trim(reverse(proto), "."))
+	name = reverse(r.String())
 
 	return
 }

@@ -9,16 +9,19 @@ import (
 	"github.com/miekg/dns"
 )
 
+// Cache stores services in memory.
 type Cache struct {
 	services map[string]*Service
 }
 
+// NewCache returns a new in-memory cache.
 func NewCache() *Cache {
 	return &Cache{
 		services: make(map[string]*Service),
 	}
 }
 
+// Services returns a list of stored services.
 func (c *Cache) Services() []*Service {
 	tmp := []*Service{}
 	for _, s := range c.services {

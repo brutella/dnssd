@@ -9,6 +9,7 @@ import (
 	"github.com/miekg/dns"
 )
 
+// PTR returns the PTR record for the service.
 func PTR(srv Service) *dns.PTR {
 	return &dns.PTR{
 		Hdr: dns.RR_Header{
@@ -33,6 +34,7 @@ func DNSSDServicesPTR(srv Service) *dns.PTR {
 	}
 }
 
+// SRV returns the SRV record for the service.
 func SRV(srv Service) *dns.SRV {
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
@@ -48,6 +50,7 @@ func SRV(srv Service) *dns.SRV {
 	}
 }
 
+// TXT returns the TXT record for the service.
 func TXT(srv Service) *dns.TXT {
 	keys := []string{}
 	for key := range srv.Text {
@@ -71,6 +74,7 @@ func TXT(srv Service) *dns.TXT {
 	}
 }
 
+// NSEC returns the NSEC record for the service.
 func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	if iface != nil && !srv.IsVisibleAtInterface(iface.Name) {
 		return nil
@@ -116,6 +120,7 @@ func NSEC(rr dns.RR, srv Service, iface *net.Interface) *dns.NSEC {
 	return nil
 }
 
+// A returns the A records (IPv4 addresses) for the service.
 func A(srv Service, iface *net.Interface) []*dns.A {
 	if iface == nil {
 		return []*dns.A{}
@@ -146,6 +151,7 @@ func A(srv Service, iface *net.Interface) []*dns.A {
 	return as
 }
 
+// AAAA returns the AAAA records (IPv6 addresses) of the service.
 func AAAA(srv Service, iface *net.Interface) []*dns.AAAA {
 	if iface == nil {
 		return []*dns.AAAA{}

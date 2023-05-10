@@ -21,6 +21,22 @@ func TestParseServiceInstanceName(t *testing.T) {
 	}
 }
 
+func TestParseEscapedServiceInstanceName(t *testing.T) {
+	instance, service, domain := parseServiceInstanceName("Home\\ Printer\\ v1\\.0._hap._tcp.local.")
+
+	if is, want := instance, "Home\\ Printer\\ v1\\.0"; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
+
+	if is, want := service, "_hap._tcp"; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
+
+	if is, want := domain, "local"; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
+}
+
 func TestParseHostname(t *testing.T) {
 	name, domain := parseHostname("Computer.local.")
 
