@@ -63,7 +63,7 @@ Once a service is added to a responder, you can use the `hdl` to update properti
 hdl.UpdateText(map[string]string{"key1": "value1", "key2": "value2"}, rsp)
 ```
 
-## `dnssd` cli
+## `dnssd` command
 
 The command line tool in `cmd/dnssd` lets you browse, register and resolve services similar to [dns-sd](https://www.unix.com/man-page/osx/1/dns-sd/).
 
