@@ -170,7 +170,7 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 
 			queriesCount++
 			for _, q := range queries {
-				log.Debug.Println("Sending probe", q.msg)
+				log.Debug.Println("Sending probe", q.iface.Name, q.msg)
 				if err := conn.SendQuery(q); err != nil {
 					log.Debug.Println("Sending probe err:", err)
 				}
