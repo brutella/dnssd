@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/brutella/dnssd/log"
 	"github.com/miekg/dns"
@@ -354,6 +355,7 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
+			c.ipv4.PacketConn.SetWriteDeadline(time.Now().Add(time.Second))
 			if _, err = c.ipv4.WriteTo(out, ctrl, addr); err != nil {
 				return err
 			}
@@ -368,6 +370,7 @@ func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAdd
 					IfIndex: iface.Index,
 				}
 			}
+			c.ipv6.PacketConn.SetWriteDeadline(time.Now().Add(time.Second))
 			if _, err = c.ipv6.WriteTo(out, ctrl, addr); err != nil {
 				return err
 			}
