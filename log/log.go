@@ -1,7 +1,7 @@
 package log
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 )
@@ -9,7 +9,7 @@ import (
 var (
 	// Debug generates debug lines of output with a "DEBUG" prefix.
 	// By default the lines are written to /dev/null.
-	Debug = &Logger{log.New(ioutil.Discard, "DEBUG ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)}
+	Debug = &Logger{log.New(io.Discard, "DEBUG ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)}
 
 	// Info generates debug lines of output with a "INFO" prefix.
 	// By default the lines are written to stdout.
@@ -24,7 +24,7 @@ type Logger struct {
 
 // Disable sets the logging output to /dev/null.
 func (l *Logger) Disable() {
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 }
 
 // Enable sets the logging output to stdout.
