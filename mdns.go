@@ -263,6 +263,13 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 					if err != nil {
 						continue
 					}
+				} else {
+					//On Windows, the ControlMessage for ReadFrom and WriteTo methods of PacketConn is not implemented.
+					//ref https://pkg.go.dev/golang.org/x/net/ipv4#pkg-note-BUG
+					iface, err = getInterfaceByIp(udpAddr.IP)
+					if err != nil {
+						continue
+					}
 				}
 
 				if n > 0 {
@@ -297,6 +304,14 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 				var iface *net.Interface
 				if cm != nil {
 					iface, err = net.InterfaceByIndex(cm.IfIndex)
+					if err != nil {
+						continue
+					}
+				} else {
+					//On Windows, the ControlMessage for ReadFrom and WriteTo methods of PacketConn is not implemented.
+					//ref https://pkg.go.dev/golang.org/x/net/ipv6#pkg-note-BUG
+					//The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+					iface, err = net.InterfaceByName(udpAddr.Zone)
 					if err != nil {
 						continue
 					}
@@ -499,4 +514,24 @@ func isUnicastQuestion(q dns.Question) bool {
 	//    qclass field is used to indicate that unicast responses are preferred
 	//    for this particular question.  (See Section 5.4.)
 	return q.Qclass&(1<<15) != 0
+}
+
+func getInterfaceByIp(ip net.IP) (*net.Interface, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iface := range interfaces {
+		// check interface running flag
+		if iface.Flags&net.FlagRunning != 0 {
+			addrs, _ := iface.Addrs()
+			for _, addr := range addrs {
+				if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(ip) {
+					return &iface, nil
+				}
+			}
+		}
+	}
+	return nil, fmt.Errorf("could not find interface by %v", ip)
 }
