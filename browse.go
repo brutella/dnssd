@@ -27,6 +27,17 @@ type AddFunc func(BrowseEntry)
 // RmvFunc is called when a service instance disappared.
 type RmvFunc func(BrowseEntry)
 
+// LookupTypeOnInts browses for service instanced with a specified service type on specified interfaces.
+func LookupTypeOnInts(ctx context.Context, service string, add AddFunc, rmv RmvFunc, ints []string) (err error) {
+	conn, err := newMDNSConn(ints...)
+	if err != nil {
+		return err
+	}
+	defer conn.close()
+
+	return lookupType(ctx, service, conn, add, rmv)
+}
+
 // LookupType browses for service instanced with a specified service type.
 func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
 	conn, err := newMDNSConn()
