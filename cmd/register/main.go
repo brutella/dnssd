@@ -43,13 +43,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if resp, err := dnssd.NewResponder(); err != nil {
+	ifaces := []string{}
+	if len(*interfaceFlag) > 0 {
+		ifaces = append(ifaces, *interfaceFlag)
+	}
+
+	if resp, err := dnssd.NewResponder(ifaces...); err != nil {
 		fmt.Println(err)
 	} else {
-		ifaces := []string{}
-		if len(*interfaceFlag) > 0 {
-			ifaces = append(ifaces, *interfaceFlag)
-		}
 
 		cfg := dnssd.Config{
 			Name:   *instanceFlag,
