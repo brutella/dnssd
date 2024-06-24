@@ -91,6 +91,12 @@ func (r Request) IfaceName() string {
 	return "?"
 }
 
+// IsLegacyUnicast returns `true` if the request came from a non-5353 port and thus, the resolver is a simple resolver by https://datatracker.ietf.org/doc/html/rfc6762#section-6.7).
+// For legacy unicast requests, the response needs to look like a normal unicast DNS response.
+func isLegacyUnicastSource(addr *net.UDPAddr) bool {
+	return addr != nil && addr.Port != 5353
+}
+
 // MDNSConn represents a mDNS connection. It encapsulates an IPv4 and IPv6 UDP connection.
 type MDNSConn interface {
 	// SendQuery sends a mDNS query.
@@ -127,7 +133,6 @@ func (c *mdnsConn) SendQuery(q *Query) error {
 
 // SendResponse sends a response.
 // The message is sent as unicast, if an receiver address is specified in the response.
-// Otherwise the message is sent multicast.
 func (c *mdnsConn) SendResponse(resp *Response) error {
 	if resp.addr != nil {
 		return c.sendResponseTo(resp.msg, resp.iface, resp.addr)
@@ -341,7 +346,10 @@ func (c *mdnsConn) sendResponse(m *dns.Msg, iface *net.Interface) error {
 }
 
 func (c *mdnsConn) sendResponseTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAddr) error {
-	sanitizeResponse(m)
+	// Don't sanitize legacy unicast responses.
+	if !isLegacyUnicastSource(addr) {
+		sanitizeResponse(m)
+	}
 
 	return c.writeMsgTo(m, iface, addr)
 }
@@ -360,7 +368,10 @@ func (c *mdnsConn) writeMsg(m *dns.Msg, iface *net.Interface) error {
 }
 
 func (c *mdnsConn) writeMsgTo(m *dns.Msg, iface *net.Interface, addr *net.UDPAddr) error {
-	sanitizeMsg(m)
+	// Don't sanitize legacy unicast responses.
+	if !isLegacyUnicastSource(addr) {
+		sanitizeMsg(m)
+	}
 
 	if c.ipv4 != nil && addr.IP.To4() != nil {
 		if out, err := m.Pack(); err == nil {
