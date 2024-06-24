@@ -132,15 +132,8 @@ func (c *mdnsConn) SendQuery(q *Query) error {
 }
 
 // SendResponse sends a response.
-// The message is:
-// 1. sent as legacy unicast, if destination port is not 5353,
-// 2. sent as unicast, if the receiver address is specified in the response,
-// Otherwise the message is sent multicast.
+// The message is sent as unicast, if an receiver address is specified in the response.
 func (c *mdnsConn) SendResponse(resp *Response) error {
-	if isLegacyUnicastSource(resp.addr) {
-		return c.sendResponseTo(resp.msg, resp.iface, resp.addr)
-	}
-
 	if resp.addr != nil {
 		return c.sendResponseTo(resp.msg, resp.iface, resp.addr)
 	}
