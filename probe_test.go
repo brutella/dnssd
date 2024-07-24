@@ -135,7 +135,7 @@ func TestProbing(t *testing.T) {
 		t.Fatal(x)
 	}
 
-	if is, want := resolved.Host, "My-Computer 2"; is != want {
+	if is, want := resolved.Host, "My-Computer_2"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 

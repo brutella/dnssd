@@ -75,7 +75,7 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 
 		if conflict.hostname && (prevConflict.hostname || probeOnce) {
 			numHostConflicts++
-			candidate.Host = fmt.Sprintf("%s %d", srv.Host, numHostConflicts+1)
+			candidate.Host = fmt.Sprintf("%s_%d", srv.Host, numHostConflicts+1)
 			conflict.hostname = false
 		}
 
