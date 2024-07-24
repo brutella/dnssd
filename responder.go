@@ -321,16 +321,22 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 
 		msg := mergeMsgs(msgs)
 		msg.SetReply(req.msg)
-		msg.Question = nil
 		msg.Response = true
 		msg.Authoritative = true
+
+		// Legacy unicast response MUST be a conventional DNS server response (and thus, includes the question).
+		if isLegacyUnicastSource(req.from) {
+			msg.Question = []dns.Question{q}
+		} else {
+			msg.Question = nil
+		}
 
 		if len(msg.Answer) == 0 {
 			log.Debug.Println("No answers")
 			continue
 		}
 
-		if isUnicastQuestion(q) {
+		if isUnicastQuestion(q) || isLegacyUnicastSource(req.from) {
 			resp := &Response{msg: msg, addr: req.from, iface: req.iface}
 			log.Debug.Printf("Send unicast response\n%v to %v\n", msg, resp.addr)
 			if err := r.conn.SendResponse(resp); err != nil {
@@ -413,8 +419,10 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		resp.Extra = extra
 
-		// Set cache flush bit for non-shared records
-		setAnswerCacheFlushBit(resp)
+		if !isLegacyUnicastSource(req.from) {
+			// Set cache flush bit for non-shared records
+			setAnswerCacheFlushBit(resp)
+		}
 
 	case strings.ToLower(srv.Hostname()):
 		var answer []dns.RR
@@ -433,8 +441,10 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 			resp.Extra = []dns.RR{nsec}
 		}
 
-		// Set cache flush bit for non-shared records
-		setAnswerCacheFlushBit(resp)
+		if !isLegacyUnicastSource(req.from) {
+			// Set cache flush bit for non-shared records
+			setAnswerCacheFlushBit(resp)
+		}
 
 	case strings.ToLower(srv.ServicesMetaQueryName()):
 		resp.Answer = []dns.RR{DNSSDServicesPTR(srv)}
@@ -447,7 +457,9 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 	resp.Answer = remove(req.msg.Answer, resp.Answer)
 
 	resp.SetReply(req.msg)
-	resp.Question = nil
+	if !isLegacyUnicastSource(req.from) {
+		resp.Question = nil
+	}
 	resp.Response = true
 	resp.Authoritative = true
 
