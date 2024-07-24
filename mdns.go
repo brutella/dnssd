@@ -171,7 +171,7 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 		if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
 			log.Debug.Printf("IPv4 interface socket opt: %v", err)
 		}
-		// Enable multicast loopback to send and receive data from lo0
+		// Enable multicast loopback to receive all sent data
 		if err := connIPv4.SetMulticastLoopback(true); err != nil {
 			log.Debug.Println("IPv4 set multicast loopback:", err)
 		}
@@ -192,7 +192,7 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 		if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
 			log.Debug.Printf("IPv6 interface socket opt: %v", err)
 		}
-		// Enable multicast loopback to send and receive data from lo0
+		// Enable multicast loopback to receive all sent data
 		if err := connIPv6.SetMulticastLoopback(true); err != nil {
 			log.Debug.Println("IPv6 set multicast loopback:", err)
 		}
