@@ -2,14 +2,13 @@
 package main
 
 import (
-	"log"
-	"net"
-
 	"github.com/brutella/dnssd"
+	"github.com/brutella/dnssd/log"
 
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -25,12 +24,13 @@ var ipFlag = flag.String("IP", "", "")
 var portFlag = flag.Int("Port", 0, "")
 var interfaceFlag = flag.String("Interface", "", "")
 var timeFormat = "15:04:05.000"
+var verboseFlag = flag.Bool("Verbose", false, "Verbose logging")
 
 // Name of the invoked executable.
 var name = filepath.Base(os.Args[0])
 
 func printUsage() {
-	log.Println("A DNS-SD utilty to register, browse and resolve Bonjour services.\n\n" +
+	log.Info.Println("A DNS-SD utilty to register, browse and resolve Bonjour services.\n\n" +
 		"Usage:\n" +
 		"  " + name + " register -Name <string> -Type <string> -Port <int> [-Domain <string> (-Interface <string> | -Host <string> -IP <string> )]\n" +
 		"  " + name + " browse                  -Type <string>             [-Domain <string>]\n" +
@@ -69,7 +69,7 @@ func resolve(typee, instance string) {
 
 func register(instance string) {
 	if *portFlag == 0 {
-		log.Println("invalid port", *portFlag)
+		log.Info.Println("invalid port", *portFlag)
 		printUsage()
 		return
 	}
@@ -78,7 +78,7 @@ func register(instance string) {
 	if *ipFlag != "" {
 		ip := net.ParseIP(*ipFlag)
 		if ip == nil {
-			log.Println("invalid ip", *ipFlag)
+			log.Info.Println("invalid ip", *ipFlag)
 			printUsage()
 			return
 		}
@@ -111,7 +111,7 @@ func register(instance string) {
 		}
 		srv, err := dnssd.NewService(cfg)
 		if err != nil {
-			log.Fatal(err)
+			log.Info.Fatal(err)
 		}
 
 		go func() {
@@ -184,6 +184,10 @@ func main() {
 	if *typeFlag == "" {
 		printUsage()
 		return
+	}
+
+	if *verboseFlag {
+		log.Debug.Enable()
 	}
 
 	typee := fmt.Sprintf("%s.%s.", strings.Trim(*typeFlag, "."), strings.Trim(*domainFlag, "."))
