@@ -197,6 +197,21 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	return ips
 }
 
+// HasIPOnAnyInterface returns true, if the service defines
+// the ip address on any network interface.
+func (s *Service) HasIPOnAnyInterface(ip net.IP) bool {
+	for _, iface := range s.Interfaces() {
+		ips := s.IPsAtInterface(iface)
+		for _, ifaceIP := range ips {
+			if ifaceIP.Equal(ip) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // Copy returns a copy of the service.
 func (s Service) Copy() *Service {
 	return &Service{

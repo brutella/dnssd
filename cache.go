@@ -1,7 +1,6 @@
 package dnssd
 
 import (
-	"net"
 	"sort"
 	"strings"
 	"time"
@@ -32,8 +31,8 @@ func (c *Cache) Services() []*Service {
 
 // UpdateFrom updates the cache from resource records in msg.
 // TODO consider the cache-flush bit to make records as to be deleted in one second
-func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service, rmvs []*Service) {
-	answers := filterRecords(msg, iface, nil)
+func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
+	answers := filterRecords(req, nil)
 	sort.Sort(byType(answers))
 
 	for _, answer := range answers {
@@ -80,14 +79,14 @@ func (c *Cache) UpdateFrom(msg *dns.Msg, iface *net.Interface) (adds []*Service,
 		case *dns.A:
 			for _, entry := range c.services {
 				if entry.Hostname() == rr.Hdr.Name {
-					entry.addIP(rr.A, iface)
+					entry.addIP(rr.A, req.iface)
 				}
 			}
 
 		case *dns.AAAA:
 			for _, entry := range c.services {
 				if entry.Hostname() == rr.Hdr.Name {
-					entry.addIP(rr.AAAA, iface)
+					entry.addIP(rr.AAAA, req.iface)
 				}
 			}
 
@@ -156,17 +155,19 @@ func (a byType) Less(i, j int) bool {
 	return false
 }
 
-func filterRecords(m *dns.Msg, iface *net.Interface, service *Service) []dns.RR {
-	if iface != nil && service != nil && len(service.Ifaces) > 0 {
-		if !service.IsVisibleAtInterface(iface.Name) {
-			// Ignnore message if coming from a ignored interface.
+// filterRecords return a list of records which are new to use and related to the service.
+func filterRecords(req *Request, service *Service) []dns.RR {
+	if req.iface != nil && service != nil && len(service.Ifaces) > 0 {
+		if !service.IsVisibleAtInterface(req.iface.Name) {
+			// Ignore records if the request coming from an ignored interface.
 			return []dns.RR{}
 		}
 	}
+
 	var all []dns.RR
-	all = append(all, m.Answer...)
-	all = append(all, m.Ns...)
-	all = append(all, m.Extra...)
+	all = append(all, req.msg.Answer...)
+	all = append(all, req.msg.Ns...)
+	all = append(all, req.msg.Extra...)
 
 	if service == nil {
 		return all
@@ -181,10 +182,27 @@ func filterRecords(m *dns.Msg, iface *net.Interface, service *Service) []dns.RR 
 			}
 		case *dns.A:
 			if service.Hostname() != rr.Hdr.Name {
+				// Ignore records from another host.
 				continue
 			}
+
+			ip := rr.A.To4()
+			if service.HasIPOnAnyInterface(ip) {
+				// Ignore this record because we know that the service
+				// has this ip address but on a different interface.
+				continue
+			}
+
 		case *dns.AAAA:
 			if service.Hostname() != rr.Hdr.Name {
+				// Ignore records from another host
+				continue
+			}
+
+			ip := rr.AAAA.To16()
+			if service.HasIPOnAnyInterface(ip) {
+				// Ignore this record because we know that the service
+				// has this ip address but on a different interface.
 				continue
 			}
 		}

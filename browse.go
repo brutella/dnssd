@@ -96,7 +96,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 		case req := <-ch:
 			log.Debug.Printf("Receive message at %s\n%s\n", req.IfaceName(), req.msg)
-			cache.UpdateFrom(req.msg, req.iface)
+			cache.UpdateFrom(req)
 			for _, srv := range cache.Services() {
 				if srv.ServiceName() != service {
 					continue

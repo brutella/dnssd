@@ -60,7 +60,7 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 				log.Info.Println(err)
 			}
 		case req := <-ch:
-			cache.UpdateFrom(req.msg, req.iface)
+			cache.UpdateFrom(req)
 			if s, ok := cache.services[instance]; ok {
 				srv = *s
 				return

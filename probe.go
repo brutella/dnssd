@@ -127,7 +127,7 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 				continue
 			}
 
-			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp.msg, rsp.iface, &service))
+			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp, &service))
 
 			as := A(service, rsp.iface)
 			aaaas := AAAA(service, rsp.iface)

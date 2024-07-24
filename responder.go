@@ -480,7 +480,7 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	aaaas := AAAA(*handle.service, req.iface)
 	srv := SRV(*handle.service)
 
-	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req.msg, req.iface, handle.service))
+	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req, handle.service))
 
 	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)
