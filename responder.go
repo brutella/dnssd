@@ -45,8 +45,8 @@ type responder struct {
 }
 
 // NewResponder returns a new mDNS responder.
-func NewResponder() (Responder, error) {
-	conn, err := newMDNSConn()
+func NewResponder(ifs ...string) (Responder, error) {
+	conn, err := newMDNSConn(ifs...)
 	if err != nil {
 		return nil, err
 	}
