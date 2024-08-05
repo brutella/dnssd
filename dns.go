@@ -63,6 +63,11 @@ func TXT(srv Service) *dns.TXT {
 		txts = append(txts, fmt.Sprintf("%s=%s", k, srv.Text[k]))
 	}
 
+	// An empty TXT record containing zero strings is not allowed. (RFC6763 6.1)
+	if len(txts) == 0 {
+		txts = []string{""}
+	}
+
 	return &dns.TXT{
 		Hdr: dns.RR_Header{
 			Name:   srv.ServiceInstanceName(),
