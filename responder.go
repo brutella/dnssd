@@ -121,6 +121,8 @@ func (r *responder) Respond(ctx context.Context) error {
 		return err
 	}
 
+	go r.linkSubscribe(ctx)
+
 	return r.respond(ctx)
 }
 
