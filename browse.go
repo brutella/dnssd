@@ -53,7 +53,7 @@ func (e BrowseEntry) UnescapedServiceInstanceName() string {
 
 // UnescapedName returns the unescaped instance name.
 func (e BrowseEntry) UnescapedName() string {
-	return unquote.Replace(e.Name)
+	return unescape.Replace(e.Name)
 }
 
 func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {

@@ -101,17 +101,17 @@ func (r *responder) Add(srv Service) (ServiceHandle, error) {
 func (r *responder) Respond(ctx context.Context) error {
 	r.mutex.Lock()
 	err := func() error {
-	r.isRunning = true
-	for _, h := range r.unmanaged {
-		log.Debug.Println(h.service)
-		srv, err := r.register(ctx, *h.service)
-		if err != nil {
-			return err
-		}
+		r.isRunning = true
+		for _, h := range r.unmanaged {
+			log.Debug.Println(h.service)
+			srv, err := r.register(ctx, *h.service)
+			if err != nil {
+				return err
+			}
 
-		h.service = &srv
-		r.managed = append(r.managed, h)
-	}
+			h.service = &srv
+			r.managed = append(r.managed, h)
+		}
 		r.unmanaged = []*serviceHandle{}
 		return nil
 	}()
@@ -380,8 +380,8 @@ func (r *responder) reprobe(h *serviceHandle) {
 
 func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *dns.Msg {
 	resp := new(dns.Msg)
-
-	switch strings.ToLower(q.Name) {
+	name := unescape.Replace(q.Name)
+	switch strings.ToLower(name) {
 	case strings.ToLower(srv.ServiceName()):
 		ptr := PTR(srv)
 		resp.Answer = []dns.RR{ptr}

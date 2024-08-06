@@ -244,7 +244,7 @@ func (s Service) UnescapedServiceInstanceName() string {
 
 // UnescapedName returns the unescaped instance name.
 func (s Service) UnescapedName() string {
-	return unquote.Replace(s.Name)
+	return unescape.Replace(s.Name)
 }
 
 // ServiceName returns the service name in the
@@ -304,7 +304,7 @@ func newService(instance string) *Service {
 	}
 }
 
-var unquote = strings.NewReplacer("\\", "")
+var unescape = strings.NewReplacer("\\", "")
 
 func reverse(s string) string {
 	r := []rune(s)
