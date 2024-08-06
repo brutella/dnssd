@@ -100,6 +100,7 @@ func (r *responder) Add(srv Service) (ServiceHandle, error) {
 
 func (r *responder) Respond(ctx context.Context) error {
 	r.mutex.Lock()
+	err := func() error {
 	r.isRunning = true
 	for _, h := range r.unmanaged {
 		log.Debug.Println(h.service)
@@ -111,8 +112,14 @@ func (r *responder) Respond(ctx context.Context) error {
 		h.service = &srv
 		r.managed = append(r.managed, h)
 	}
-	r.unmanaged = []*serviceHandle{}
+		r.unmanaged = []*serviceHandle{}
+		return nil
+	}()
 	r.mutex.Unlock()
+
+	if err != nil {
+		return err
+	}
 
 	return r.respond(ctx)
 }
