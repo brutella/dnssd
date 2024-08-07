@@ -279,7 +279,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 				if n > 0 {
 					m := new(dns.Msg)
-					if err := m.Unpack(buf); err == nil && !shouldIgnore(m) {
+					if err := m.Unpack(buf); err == nil && !shouldIgnore(m) && !m.Response {
 						ch <- &Request{m, udpAddr, iface}
 					}
 				}
@@ -324,7 +324,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 				if n > 0 {
 					m := new(dns.Msg)
-					if err := m.Unpack(buf); err == nil && !shouldIgnore(m) {
+					if err := m.Unpack(buf); err == nil && !shouldIgnore(m) && !m.Response {
 						ch <- &Request{m, udpAddr, iface}
 					}
 				}
