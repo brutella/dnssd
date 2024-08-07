@@ -77,7 +77,7 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().UnescapedServiceInstanceName())
+				fmt.Printf("%s	Got a reply for service %s: Name now registered and active\n", time.Now().Format(timeFormat), handle.Service().ServiceInstanceName())
 			}
 		}()
 		err = resp.Respond(ctx)

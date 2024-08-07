@@ -99,7 +99,7 @@ func TestProbing(t *testing.T) {
 	cfg := Config{
 		Name:   "My Service",
 		Type:   "_hap._tcp",
-		Host:   "My-Computer",
+		Host:   "My Computer",
 		Port:   12334,
 		Ifaces: []string{testIface.Name},
 	}
@@ -135,11 +135,11 @@ func TestProbing(t *testing.T) {
 		t.Fatal(x)
 	}
 
-	if is, want := resolved.Host, "My-Computer_2"; is != want {
+	if is, want := resolved.Host, "My-Computer-2"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 
-	if is, want := resolved.Name, "My Service 2"; is != want {
+	if is, want := resolved.Name, "My Service (2)"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 

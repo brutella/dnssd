@@ -2,7 +2,6 @@ package dnssd
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"net"
 	"sort"
@@ -75,13 +74,13 @@ func probeService(ctx context.Context, conn MDNSConn, srv Service, delay time.Du
 
 		if conflict.hostname && (prevConflict.hostname || probeOnce) {
 			numHostConflicts++
-			candidate.Host = fmt.Sprintf("%s_%d", srv.Host, numHostConflicts+1)
+			candidate.Host = incrementHostname(candidate.Host, numHostConflicts+1)
 			conflict.hostname = false
 		}
 
 		if conflict.serviceName && (prevConflict.serviceName || probeOnce) {
 			numNameConflicts++
-			candidate.Name = fmt.Sprintf("%s %d", srv.Name, numNameConflicts+1)
+			candidate.Name = incrementServiceName(candidate.Name, numNameConflicts+1)
 			conflict.serviceName = false
 		}
 
@@ -131,7 +130,6 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 
 			as := A(service, rsp.iface)
 			aaaas := AAAA(service, rsp.iface)
-			srv := SRV(service)
 
 			if len(reqAs) > 0 && len(as) > 0 && areDenyingAs(reqAs, as) {
 				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
@@ -147,11 +145,9 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 				conflict.hostname = true
 			}
 
-			for _, reqSRV := range reqSRVs {
-				if isDenyingSRV(reqSRV, srv) {
-					conflict.serviceName = true
-				}
-			}
+			// If the service instance name is already taken from another host,
+			// we have a service instance name conflict
+			conflict.serviceName = len(reqSRVs) > 0
 
 		case <-ctx.Done():
 			err = ctx.Err()
@@ -187,7 +183,7 @@ func probeQuery(service Service, iface *net.Interface) *Query {
 	msg := new(dns.Msg)
 
 	instanceQ := dns.Question{
-		Name:   service.ServiceInstanceName(),
+		Name:   service.EscapedServiceInstanceName(),
 		Qtype:  dns.TypeANY,
 		Qclass: dns.ClassINET,
 	}

@@ -41,19 +41,14 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 // ServiceInstanceName returns the service instance name
 // in the form of <instance name>.<service>.<domain>.
 // (Note the trailing dot.)
+func (e BrowseEntry) EscapedServiceInstanceName() string {
+	return fmt.Sprintf("%s.%s.%s.", escape.Replace(e.Name), e.Type, e.Domain)
+}
+
+// ServiceInstanceName returns the same as `ServiceInstanceName()`
+// but removes any escape characters.
 func (e BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
-}
-
-// UnescapedServiceInstanceName returns the same as `ServiceInstanceName()`
-// but removes any escape characters.
-func (e BrowseEntry) UnescapedServiceInstanceName() string {
-	return fmt.Sprintf("%s.%s.%s.", e.UnescapedName(), e.Type, e.Domain)
-}
-
-// UnescapedName returns the unescaped instance name.
-func (e BrowseEntry) UnescapedName() string {
-	return unescape.Replace(e.Name)
 }
 
 func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {

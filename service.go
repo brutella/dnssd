@@ -54,6 +54,49 @@ func (c Config) Copy() Config {
 	}
 }
 
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isAlpha(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+func isWhitespace(r rune) bool {
+	return r == ' '
+}
+
+// validHostname returns a valid hostname as specified in RFC-952 and RFC1123.
+func validHostname(host string) string {
+	result := ""
+	z := len(host) - 1
+	for i, r := range host {
+		if isWhitespace(r) {
+			r = '-'
+		}
+		// hostname must start with an alpha [RFC-952 ASSUMPTIONS] or digit [RFC1123 2.1] character.
+		if i == 0 && (!isDigit(r) && !isAlpha(r)) {
+			log.Debug.Printf(`hostname "%s" starts with "%s"`, host, string(r))
+			continue
+		}
+
+		// [RFC-952 ASSUMPTIONS] The last character must not be a minus sign or period.
+		if i == z && (r == '-' || r == '.') {
+			log.Debug.Printf(`hostname "%s" ends with "%s"`, host, string(r))
+			continue
+		}
+
+		if !isDigit(r) && !isAlpha(r) && r != '-' && r != '.' {
+			log.Debug.Printf(`hostname "%s" contains "%s"`, host, string(r))
+			continue
+		}
+
+		result += string(r)
+	}
+
+	return result
+}
+
 // Service represents a DNS-SD service instance
 type Service struct {
 	Name   string
@@ -73,9 +116,7 @@ type Service struct {
 
 // NewService returns a new service for the given config.
 func NewService(cfg Config) (s Service, err error) {
-	// Escape dots in the name (RFC6763 4.3).
-	// Spaces and backslashes are escaped by "github.com/miekg/dns".
-	name := strings.Replace(cfg.Name, ".", "\\.", -1)
+	name := cfg.Name
 	typ := cfg.Type
 	port := cfg.Port
 
@@ -121,10 +162,10 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	return Service{
-		Name:     name,
+		Name:     trimServiceNameSuffixRight(name),
 		Type:     typ,
 		Domain:   domain,
-		Host:     host,
+		Host:     validHostname(host),
 		Text:     text,
 		Port:     port,
 		IPs:      ips,
@@ -229,22 +270,83 @@ func (s Service) Copy() *Service {
 	}
 }
 
+func (s Service) EscapedName() string {
+	return escape.Replace(s.Name)
+}
+
+func incrementHostname(name string, count int) string {
+	return fmt.Sprintf("%s-%d", trimHostNameSuffixRight(name), count)
+}
+
+func trimHostNameSuffixRight(name string) string {
+	minus := strings.LastIndex(name, "-")
+	if minus == -1 || /* not found*/
+		minus == len(name)-1 /* at the end */ {
+		return name
+	}
+
+	// after minus
+	after := name[minus+1:]
+	for _, r := range after {
+		if !isDigit(r) {
+			return name
+		}
+	}
+
+	trimmed := name[:minus]
+	if len(trimmed) == 0 {
+		return name
+	}
+	return trimmed
+}
+
+// trimServiceNameSuffixRight removes any suffix with the format " (%d)".
+func trimServiceNameSuffixRight(name string) string {
+	open := strings.LastIndex(name, "(")
+	close := strings.LastIndex(name, ")")
+	if open == -1 || close == -1 || /* not found*/
+		open >= close || /* wrong order */
+		open == 0 || /* at the beginning */
+		close != len(name)-1 /* not at the end */ {
+		return name
+	}
+
+	// between brackets are only numbers
+	between := name[open+1 : close-1]
+	for _, r := range between {
+		if !isDigit(r) {
+			return name
+		}
+	}
+
+	// before opening bracket is a whitespace
+	if name[open-1] != ' ' {
+		return name
+	}
+
+	trimmed := name[:open]
+	trimmed = strings.TrimRight(trimmed, " ")
+	if len(trimmed) == 0 {
+		return name
+	}
+	return trimmed
+}
+
+func incrementServiceName(name string, count int) string {
+	return fmt.Sprintf("%s (%d)", trimServiceNameSuffixRight(name), count)
+}
+
+// EscapedServiceInstanceName returns the same as `ServiceInstanceName()`
+// but escapes any special characters.
+func (s Service) EscapedServiceInstanceName() string {
+	return fmt.Sprintf("%s.%s.%s.", s.EscapedName(), s.Type, s.Domain)
+}
+
 // ServiceInstanceName returns the service instance name
 // in the form of <instance name>.<service>.<domain>.
 // (Note the trailing dot.)
 func (s Service) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", s.Name, s.Type, s.Domain)
-}
-
-// UnescapedServiceInstanceName returns the same as `ServiceInstanceName()`
-// but removes any escape characters.
-func (s Service) UnescapedServiceInstanceName() string {
-	return fmt.Sprintf("%s.%s.%s.", s.UnescapedName(), s.Type, s.Domain)
-}
-
-// UnescapedName returns the unescaped instance name.
-func (s Service) UnescapedName() string {
-	return unescape.Replace(s.Name)
 }
 
 // ServiceName returns the service name in the
@@ -305,6 +407,17 @@ func newService(instance string) *Service {
 }
 
 var unescape = strings.NewReplacer("\\", "")
+var escape *strings.Replacer
+
+func init() {
+	specialChars := []byte{'.', ' ', '\'', '@', ';', '(', ')', '"', '\\'}
+	replaces := make([]string, 2*len(specialChars))
+	for i, char := range specialChars {
+		replaces[2*i] = string(char)
+		replaces[2*i+1] = "\\" + string(char)
+	}
+	escape = strings.NewReplacer(replaces...)
+}
 
 func reverse(s string) string {
 	r := []rune(s)
@@ -334,6 +447,7 @@ func parseServiceInstanceName(str string) (name string, service string, domain s
 	}
 	service = fmt.Sprintf("%s.%s", strings.Trim(reverse(typee), "."), strings.Trim(reverse(proto), "."))
 	name = reverse(r.String())
+	name = unescape.Replace(name)
 
 	return
 }
@@ -347,11 +461,7 @@ func hostname() string {
 	}
 
 	name, _ := parseHostname(hostname)
-	return sanitizeHostname(name)
-}
-
-func sanitizeHostname(name string) string {
-	return strings.Replace(name, " ", "-", -1)
+	return name
 }
 
 func parseHostname(str string) (name string, domain string) {

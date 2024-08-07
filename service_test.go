@@ -24,7 +24,7 @@ func TestParseServiceInstanceName(t *testing.T) {
 func TestParseEscapedServiceInstanceName(t *testing.T) {
 	instance, service, domain := parseServiceInstanceName("Home\\ Printer\\ v1\\.0._hap._tcp.local.")
 
-	if is, want := instance, "Home\\ Printer\\ v1\\.0"; is != want {
+	if is, want := instance, "Home Printer v1.0"; is != want {
 		t.Fatalf("is=%v want=%v", is, want)
 	}
 
@@ -131,9 +131,77 @@ func TestNewServiceWithExplicitIP(t *testing.T) {
 	}
 }
 
-func TestSanitizeHostname(t *testing.T) {
-	host := sanitizeHostname("My Computer")
-	if is, want := host, "My-Computer"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
+func TestValidateHostname(t *testing.T) {
+	tests := []struct {
+		Hostname string
+		Expected string
+	}{
+		{"macbookpro.local", "macbookpro.local"},
+		{"macbookpro (2).local", "macbookpro-2.local"},
+		{"macbookpro_2.local", "macbookpro2.local"},
+		{"MacBook Pro 2019.local", "MacBook-Pro-2019.local"},
+	}
+
+	for _, test := range tests {
+		if is, want := validHostname(test.Hostname), test.Expected; is != want {
+			t.Fatalf("is=%v want=%v", is, want)
+		}
+	}
+}
+
+func TestIncrementHostName(t *testing.T) {
+	tests := []struct {
+		Name     string
+		Count    int
+		Expected string
+	}{
+		{"my-hostname", 2, "my-hostname-2"},
+		{"my-hostname-2", 3, "my-hostname-3"},
+		{"my-hostname-asdf", 3, "my-hostname-asdf-3"},
+		{"my-hostname-", 3, "my-hostname--3"},
+	}
+
+	for _, test := range tests {
+		if is, want := incrementHostname(test.Name, test.Count), test.Expected; is != want {
+			t.Fatalf("is=%v want=%v", is, want)
+		}
+	}
+}
+
+func TestIncrementServiceName(t *testing.T) {
+	tests := []struct {
+		Name     string
+		Count    int
+		Expected string
+	}{
+		{"My Name", 2, "My Name (2)"},
+		{"My Name-2", 2, "My Name-2 (2)"},
+		{"My Name (2)", 3, "My Name (3)"},
+		{"My Name (2)", 4, "My Name (4)"},
+		{"My Name(2)", 4, "My Name(2) (4)"},
+	}
+
+	for _, test := range tests {
+		if is, want := incrementServiceName(test.Name, test.Count), test.Expected; is != want {
+			t.Fatalf("is=%v want=%v", is, want)
+		}
+	}
+}
+func TestTrimServiceNameSuffixRight(t *testing.T) {
+	tests := []struct {
+		Name     string
+		Expected string
+	}{
+		{"My Name", "My Name"},
+		{"My Name(2)", "My Name(2)"},
+		{"My Name-2", "My Name-2"},
+		{"My Name (2)", "My Name"},
+		{"My Name (0)", "My Name"},
+	}
+
+	for _, test := range tests {
+		if is, want := trimServiceNameSuffixRight(test.Name), test.Expected; is != want {
+			t.Fatalf("is=%v want=%v (%+v)", is, want, test)
+		}
 	}
 }

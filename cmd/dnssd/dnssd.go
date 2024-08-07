@@ -43,12 +43,12 @@ func resolve(typee, instance string) {
 	fmt.Printf("%s	...STARTING...\n", time.Now().Format(timeFormat))
 
 	addFn := func(e dnssd.BrowseEntry) {
-		if e.UnescapedServiceInstanceName() == instance {
+		if e.ServiceInstanceName() == instance {
 			text := ""
 			for key, value := range e.Text {
 				text += fmt.Sprintf("%s=%s", key, value)
 			}
-			fmt.Printf("%s	%s can be reached at %s.%s.:%d %v\n", time.Now().Format(timeFormat), e.UnescapedServiceInstanceName(), e.Host, e.Domain, e.Port, text)
+			fmt.Printf("%s	%s can be reached at %s.%s.:%d %v\n", time.Now().Format(timeFormat), e.ServiceInstanceName(), e.Host, e.Domain, e.Port, text)
 		}
 	}
 
@@ -149,11 +149,11 @@ func browse(typee string) {
 	fmt.Printf("Timestamp	A/R	if Domain	Service Type	Instance Name\n")
 
 	addFn := func(e dnssd.BrowseEntry) {
-		fmt.Printf("%s	Add	%s	%s	%s	%s (%s)\n", time.Now().Format(timeFormat), e.IfaceName, e.Domain, e.Type, e.UnescapedName(), e.IPs)
+		fmt.Printf("%s	Add	%s	%s	%s	%s (%s)\n", time.Now().Format(timeFormat), e.IfaceName, e.Domain, e.Type, e.Name, e.IPs)
 	}
 
 	rmvFn := func(e dnssd.BrowseEntry) {
-		fmt.Printf("%s	Rmv	%s	%s	%s	%s\n", time.Now().Format(timeFormat), e.IfaceName, e.Domain, e.Type, e.UnescapedName())
+		fmt.Printf("%s	Rmv	%s	%s	%s	%s\n", time.Now().Format(timeFormat), e.IfaceName, e.Domain, e.Type, e.Name)
 	}
 
 	if err := dnssd.LookupType(ctx, typee, addFn, rmvFn); err != nil {

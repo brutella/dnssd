@@ -139,7 +139,7 @@ func (r *responder) announce(services []*Service) {
 func (r *responder) announceAtInterface(service *Service, iface *net.Interface) {
 	ips := service.IPsAtInterface(iface)
 	if len(ips) == 0 {
-		log.Debug.Printf("No IPs for service %s at %s\n", service.UnescapedServiceInstanceName(), iface.Name)
+		log.Debug.Printf("No IPs for service %s at %s\n", service.ServiceInstanceName(), iface.Name)
 		return
 	}
 
@@ -178,7 +178,7 @@ func (r *responder) register(ctx context.Context, srv Service) (Service, error) 
 		return srv, fmt.Errorf("cannot register service when responder is not responding")
 	}
 
-	log.Debug.Printf("Probing for host %s and service %s…\n", srv.Hostname(), srv.UnescapedServiceInstanceName())
+	log.Debug.Printf("Probing for host %s and service %s…\n", srv.Hostname(), srv.ServiceInstanceName())
 	probed, err := ProbeService(ctx, srv)
 	if err != nil {
 		return srv, err
@@ -320,7 +320,7 @@ func (r *responder) handleQuery(req *Request, services []*Service) {
 	for _, q := range req.msg.Question {
 		msgs := []*dns.Msg{}
 		for _, srv := range services {
-			log.Debug.Printf("%s tries to give response to question %v @%s\n", srv.UnescapedServiceInstanceName(), q, req.IfaceName())
+			log.Debug.Printf("%s tries to give response to question %v @%s\n", srv.ServiceInstanceName(), q, req.IfaceName())
 			if msg := r.handleQuestion(q, req, *srv); msg != nil {
 				msgs = append(msgs, msg)
 			} else {
@@ -382,8 +382,7 @@ func (r *responder) reprobe(h *serviceHandle) {
 
 func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *dns.Msg {
 	resp := new(dns.Msg)
-	name := unescape.Replace(q.Name)
-	switch strings.ToLower(name) {
+	switch strings.ToLower(q.Name) {
 	case strings.ToLower(srv.ServiceName()):
 		ptr := PTR(srv)
 		resp.Answer = []dns.RR{ptr}
@@ -409,7 +408,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 		log.Debug.Println("Shared record response wait", delay)
 		time.Sleep(delay)
 
-	case strings.ToLower(srv.ServiceInstanceName()):
+	case strings.ToLower(srv.EscapedServiceInstanceName()):
 		resp.Answer = []dns.RR{SRV(srv), TXT(srv), PTR(srv)}
 
 		var extra []dns.RR
@@ -496,12 +495,17 @@ func services(hs []*serviceHandle) []*Service {
 	return result
 }
 
+// containsConflictingAnswers return true, if the request contains A or AAAA records
+// which deny any A or AAAA records for a service.
+//
+// 2024-08-07 (mah) Because this method ignores SRV records, it should only
+// be used to check for conlict answers for a registered service and not for probing.
+// It is the responsibility of the probed service to find conflicting SRV records
+// and resolve them during probing.
 func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	as := A(*handle.service, req.iface)
 	aaaas := AAAA(*handle.service, req.iface)
-	srv := SRV(*handle.service)
-
-	reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(req, handle.service))
+	reqAs, reqAAAAs, _ := splitRecords(filterRecords(req, handle.service))
 
 	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)
@@ -511,12 +515,6 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
 		log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
 		return true
-	}
-
-	for _, reqSRV := range reqSRVs {
-		if isDenyingSRV(reqSRV, srv) {
-			return true
-		}
 	}
 
 	return false

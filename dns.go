@@ -18,7 +18,7 @@ func PTR(srv Service) *dns.PTR {
 			Class:  dns.ClassINET,
 			Ttl:    TTLDefault,
 		},
-		Ptr: srv.ServiceInstanceName(),
+		Ptr: srv.EscapedServiceInstanceName(),
 	}
 }
 
@@ -38,7 +38,7 @@ func DNSSDServicesPTR(srv Service) *dns.PTR {
 func SRV(srv Service) *dns.SRV {
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
-			Name:   srv.ServiceInstanceName(),
+			Name:   srv.EscapedServiceInstanceName(),
 			Rrtype: dns.TypeSRV,
 			Class:  dns.ClassINET,
 			Ttl:    TTLHostname,
@@ -70,7 +70,7 @@ func TXT(srv Service) *dns.TXT {
 
 	return &dns.TXT{
 		Hdr: dns.RR_Header{
-			Name:   srv.ServiceInstanceName(),
+			Name:   srv.EscapedServiceInstanceName(),
 			Rrtype: dns.TypeTXT,
 			Class:  dns.ClassINET,
 			Ttl:    TTLDefault,

@@ -155,7 +155,9 @@ func (a byType) Less(i, j int) bool {
 	return false
 }
 
-// filterRecords return a list of records which are new to use and related to the service.
+// filterRecords returns
+// - A and AAAA records for the same hostname as in defined by the service
+// - SRV records related to the same service instance name
 func filterRecords(req *Request, service *Service) []dns.RR {
 	if req.iface != nil && service != nil && len(service.Ifaces) > 0 {
 		if !service.IsVisibleAtInterface(req.iface.Name) {
@@ -177,12 +179,17 @@ func filterRecords(req *Request, service *Service) []dns.RR {
 	for _, answer := range all {
 		switch rr := answer.(type) {
 		case *dns.SRV:
-			if rr.Hdr.Name != service.ServiceInstanceName() {
+			if rr.Target == service.Hostname() {
+				// Ignore records coming from ourself
+				continue
+			}
+			if rr.Hdr.Name != service.EscapedServiceInstanceName() {
+				// Ignore records from other service instances
 				continue
 			}
 		case *dns.A:
-			if service.Hostname() != rr.Hdr.Name {
-				// Ignore records from another host.
+			if rr.Hdr.Name != service.Hostname() {
+				// Ignore IPv4 address from other hosts
 				continue
 			}
 
@@ -194,8 +201,8 @@ func filterRecords(req *Request, service *Service) []dns.RR {
 			}
 
 		case *dns.AAAA:
-			if service.Hostname() != rr.Hdr.Name {
-				// Ignore records from another host
+			if rr.Hdr.Name != service.Hostname() {
+				// Ignore IPv6 address from other hosts
 				continue
 			}
 
