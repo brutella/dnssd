@@ -251,22 +251,23 @@ func (r *responder) handleRequest(req *Request) {
 		req.msg = mergeMsgs(msgs)
 	}
 
-	// Conflicting records remove managed services from
-	// the responder and trigger reprobing
-	conflicts := findConflicts(req, r.managed)
-	for _, h := range conflicts {
-		log.Debug.Println("Reprobe for", h.service)
-		go r.reprobe(h)
+	if len(req.msg.Question) > 0 {
+		r.handleQuery(req, services(r.managed))
+	} else {
+		// Check if the request contains any conflicting records.
+		conflicts := findConflicts(req, r.managed)
+		for _, h := range conflicts {
+			log.Debug.Println("Reprobe for", h.service)
+			go r.reprobe(h)
 
-		for i, m := range r.managed {
-			if h == m {
-				r.managed = append(r.managed[:i], r.managed[i+1:]...)
-				break
+			for i, m := range r.managed {
+				if h == m {
+					r.managed = append(r.managed[:i], r.managed[i+1:]...)
+					break
+				}
 			}
 		}
 	}
-
-	r.handleQuery(req, services(r.managed))
 }
 
 func (r *responder) unannounce(services []*Service) {
