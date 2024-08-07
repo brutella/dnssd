@@ -9,5 +9,5 @@ import (
 )
 
 func (r *responder) linkSubscribe(context.Context) {
-	log.Info.Println("unable to wait for link updates")
+	log.Info.Println("dnssd: unable to wait for link updates")
 }

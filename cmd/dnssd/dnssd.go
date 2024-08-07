@@ -69,7 +69,7 @@ func resolve(typee, instance string) {
 
 func register(instance string) {
 	if *portFlag == 0 {
-		log.Info.Println("invalid port", *portFlag)
+		log.Info.Println("dnssd: invalid port", *portFlag)
 		printUsage()
 		return
 	}
@@ -78,7 +78,7 @@ func register(instance string) {
 	if *ipFlag != "" {
 		ip := net.ParseIP(*ipFlag)
 		if ip == nil {
-			log.Info.Println("invalid ip", *ipFlag)
+			log.Info.Println("dnssd: invalid ip", *ipFlag)
 			printUsage()
 			return
 		}

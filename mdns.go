@@ -258,7 +258,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 				udpAddr, ok := from.(*net.UDPAddr)
 				if !ok {
-					log.Info.Println("invalid source address")
+					log.Info.Println("dnssd: invalid source address")
 					continue
 				}
 
@@ -302,7 +302,7 @@ func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 				udpAddr, ok := from.(*net.UDPAddr)
 				if !ok {
-					log.Info.Println("invalid source address")
+					log.Info.Println("dnssd: invalid source address")
 					continue
 				}
 
@@ -420,66 +420,66 @@ func shouldIgnore(m *dns.Msg) bool {
 
 func sanitizeResponse(m *dns.Msg) {
 	if m.Question != nil && len(m.Question) > 0 {
-		log.Info.Println("Multicast DNS responses MUST NOT contain any questions in the Question Section.  (RFC6762 6)")
+		log.Info.Println("dnssd: Multicast DNS responses MUST NOT contain any questions in the Question Section.  (RFC6762 6)")
 		m.Question = nil
 	}
 
 	if !m.Response {
-		log.Info.Println("In response messages the QR bit MUST be one (RFC6762 18.2)")
+		log.Info.Println("dnssd: In response messages the QR bit MUST be one (RFC6762 18.2)")
 		m.Response = true
 	}
 
 	if !m.Authoritative {
-		log.Info.Println("AA Bit bit MUST be set to one in response messages (RFC6762 18.4)")
+		log.Info.Println("dnssd: AA Bit bit MUST be set to one in response messages (RFC6762 18.4)")
 		m.Authoritative = true
 	}
 
 	if m.Truncated {
-		log.Info.Println("In multicast response messages, the TC bit MUST be zero on transmission. (RFC6762 18.5)")
+		log.Info.Println("dnssd: In multicast response messages, the TC bit MUST be zero on transmission. (RFC6762 18.5)")
 		m.Truncated = false
 	}
 }
 
 func sanitizeQuery(m *dns.Msg) {
 	if m.Response {
-		log.Info.Println("In query messages the QR bit MUST be zero (RFC6762 18.2)")
+		log.Info.Println("dnssd: In query messages the QR bit MUST be zero (RFC6762 18.2)")
 		m.Response = false
 	}
 
 	if m.Authoritative {
-		log.Info.Println("AA Bit MUST be zero in query messages (RFC6762 18.4)")
+		log.Info.Println("dnssd: AA Bit MUST be zero in query messages (RFC6762 18.4)")
 		m.Authoritative = false
 	}
 }
 
 func sanitizeMsg(m *dns.Msg) {
 	if m.Opcode != 0 {
-		log.Info.Println("In both multicast query and multicast response messages, the OPCODE MUST be zero on transmission (RFC6762 18.3)")
+		log.Info.Println("dnssd: In both multicast query and multicast response messages, the OPCODE MUST be zero on transmission (RFC6762 18.3)")
 		m.Opcode = 0
 	}
 
 	if m.RecursionDesired {
-		log.Info.Println("In both multicast query and multicast response messages, the Recursion Available bit MUST be zero on transmission. (RFC6762 18.7)")
+		log.Info.Println("dnssd: In both multicast query and multicast response messages, the Recursion Available bit MUST be zero on transmission. (RFC6762 18.7)")
 		m.RecursionDesired = false
 	}
 
 	if m.Zero {
-		log.Info.Println("In both query and response messages, the Zero bit MUST be zero on transmission (RFC6762 18.8)")
+		log.Info.Println("dnssd: In both query and response messages, the Zero bit MUST be zero on transmission (RFC6762 18.8)")
 		m.Zero = false
 	}
 
 	if m.AuthenticatedData {
-		log.Info.Println("In both multicast query and multicast response messages, the Authentic Data bit MUST be zero on transmission (RFC6762 18.9)")
+		log.Info.Println("dnssd: In both multicast query and multicast response messages, the Authentic Data bit MUST be zero on transmission (RFC6762 18.9)")
 		m.AuthenticatedData = false
 	}
 
 	if m.CheckingDisabled {
-		log.Info.Println("In both multicast query and multicast response messages, the Checking Disabled bit MUST be zero on transmission (RFC6762 18.10)")
+		log.Info.Println("dnssd: In both multicast query and multicast response messages, the Checking Disabled bit MUST be zero on transmission (RFC6762 18.10)")
 		m.CheckingDisabled = false
 	}
 
 	if m.Rcode != 0 {
-		log.Info.Println("In both multicast query and multicast response messages, the Response Code MUST be zero on transmission. (RFC6762 18.11)")
+		log.Info.Println("dnssd: In both multicast query and multicast response messages, the Response Code MUST be zero on transmission. (RFC6762 18.11)")
 		m.Rcode = 0
 	}
 }

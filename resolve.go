@@ -57,7 +57,7 @@ func lookupInstance(ctx context.Context, instance string, conn MDNSConn) (srv Se
 		select {
 		case q := <-qs:
 			if err := conn.SendQuery(q); err != nil {
-				log.Info.Println(err)
+				log.Info.Println("dnssd:", err)
 			}
 		case req := <-ch:
 			cache.UpdateFrom(req)
