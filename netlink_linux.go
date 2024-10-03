@@ -24,7 +24,6 @@ func (r *responder) linkSubscribe(ctx context.Context) {
 	for {
 		select {
 		case update := <-ch:
-			r.mutex.Lock()
 			iface, err := net.InterfaceByIndex(int(update.Index))
 			if err != nil {
 				log.Info.Println(err)
@@ -43,6 +42,7 @@ func (r *responder) linkSubscribe(ctx context.Context) {
 			}
 
 			log.Debug.Println("announcing services after link update")
+			r.mutex.Lock()
 			r.announce(services(r.managed))
 			r.mutex.Unlock()
 		case <-ctx.Done():
