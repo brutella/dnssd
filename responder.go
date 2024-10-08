@@ -409,7 +409,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 		log.Debug.Println("Shared record response wait", delay)
 		time.Sleep(delay)
 
-	case strings.ToLower(srv.EscapedServiceInstanceName()):
+	case strings.ToLower(srv.ServiceInstanceName()):
 		resp.Answer = []dns.RR{SRV(srv), TXT(srv), PTR(srv)}
 
 		var extra []dns.RR
