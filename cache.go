@@ -48,7 +48,7 @@ func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
 				}
 				entry = newService(rr.Ptr)
 				adds = append(adds, entry)
-				c.services[entry.ServiceInstanceName()] = entry
+				c.services[entry.EscapedServiceInstanceName()] = entry
 			} else {
 				entry = e
 			}
@@ -66,7 +66,7 @@ func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
 				}
 				entry = newService(rr.Hdr.Name)
 				adds = append(adds, entry)
-				c.services[entry.ServiceInstanceName()] = entry
+				c.services[entry.EscapedServiceInstanceName()] = entry
 			} else {
 				entry = e
 			}
