@@ -27,7 +27,7 @@ type AddFunc func(BrowseEntry)
 // RmvFunc is called when a service instance disappared.
 type RmvFunc func(BrowseEntry)
 
-// LookupType browses for service instanced with a specified service type.
+// LookupType browses for service instances.
 func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
 	conn, err := newMDNSConn()
 	if err != nil {
@@ -36,6 +36,17 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	defer conn.close()
 
 	return lookupType(ctx, service, conn, add, rmv)
+}
+
+// LookupTypeAtInterface browses for service instances at specific network interfaces.
+func LookupTypeAtInterfaces(ctx context.Context, service string, add AddFunc, rmv RmvFunc, ifaces ...string) (err error) {
+	conn, err := newMDNSConn(ifaces...)
+	if err != nil {
+		return err
+	}
+	defer conn.close()
+
+	return lookupType(ctx, service, conn, add, rmv, ifaces...)
 }
 
 // ServiceInstanceName returns the service instance name
@@ -51,7 +62,7 @@ func (e BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
 }
 
-func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc) (err error) {
+func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc, ifaces ...string) (err error) {
 	var cache = NewCache()
 
 	m := new(dns.Msg)
@@ -73,7 +84,7 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 	qs := make(chan *Query)
 	go func() {
-		for _, iface := range MulticastInterfaces() {
+		for _, iface := range MulticastInterfaces(ifaces...) {
 			iface := iface
 			q := &Query{msg: m, iface: iface}
 			qs <- q

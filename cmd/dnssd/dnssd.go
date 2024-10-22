@@ -32,13 +32,19 @@ var name = filepath.Base(os.Args[0])
 func printUsage() {
 	log.Info.Println("A DNS-SD utilty to register, browse and resolve Bonjour services.\n\n" +
 		"Usage:\n" +
-		"  " + name + " register -Name <string> -Type <string> -Port <int> [-Domain <string> (-Interface <string> | -Host <string> -IP <string> )]\n" +
-		"  " + name + " browse                  -Type <string>             [-Domain <string>]\n" +
-		"  " + name + " resolve  -Name <string> -Type <string>             [-Domain <string>]\n")
+		"  " + name + " register -Name <string> -Type <string> -Port <int> [-Domain <string> -Interface <string[,string]> -Host <string> -IP <string>]\n" +
+		"  " + name + " browse                  -Type <string>             [-Domain <string> -Interface <string[,string]>]\n" +
+		"  " + name + " resolve  -Name <string> -Type <string>             [-Domain <string> -Interface <string[,string]>]\n")
 }
 
 func resolve(typee, instance string) {
-	fmt.Printf("Lookup %s\n", instance)
+	ifaces := parseInterfaceFlag()
+	ifaceDesc := "all interfaces"
+	if len(ifaces) > 0 {
+		ifaceDesc = strings.Join(ifaces, ", ")
+	}
+
+	fmt.Printf("Lookup %s at %s\n", instance, ifaceDesc)
 	fmt.Printf("DATE: –––%s–––\n", time.Now().Format("Mon Jan 2 2006"))
 	fmt.Printf("%s	...STARTING...\n", time.Now().Format(timeFormat))
 
@@ -55,7 +61,7 @@ func resolve(typee, instance string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := dnssd.LookupType(ctx, typee, addFn, func(dnssd.BrowseEntry) {}); err != nil {
+	if err := dnssd.LookupTypeAtInterfaces(ctx, typee, addFn, func(dnssd.BrowseEntry) {}, ifaces...); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -69,7 +75,7 @@ func resolve(typee, instance string) {
 
 func register(instance string) {
 	if *portFlag == 0 {
-		log.Info.Println("dnssd: invalid port", *portFlag)
+		log.Info.Println("invalid port", *portFlag)
 		printUsage()
 		return
 	}
@@ -78,7 +84,7 @@ func register(instance string) {
 	if *ipFlag != "" {
 		ip := net.ParseIP(*ipFlag)
 		if ip == nil {
-			log.Info.Println("dnssd: invalid ip", *ipFlag)
+			log.Info.Println("invalid ip", *ipFlag)
 			printUsage()
 			return
 		}
@@ -95,17 +101,12 @@ func register(instance string) {
 	if resp, err := dnssd.NewResponder(); err != nil {
 		fmt.Println(err)
 	} else {
-		ifaces := []string{}
-		if len(*interfaceFlag) > 0 {
-			ifaces = append(ifaces, *interfaceFlag)
-		}
-
 		cfg := dnssd.Config{
 			Name:   *nameFlag,
 			Type:   *typeFlag,
 			Domain: *domainFlag,
 			Port:   *portFlag,
-			Ifaces: ifaces,
+			Ifaces: parseInterfaceFlag(),
 			IPs:    ips,
 			Host:   *hostFlag,
 		}
@@ -139,11 +140,32 @@ func register(instance string) {
 	}
 }
 
+func parseInterfaceFlag() []string {
+	ifaces := []string{}
+	if len(*interfaceFlag) > 0 {
+		for _, iface := range strings.Split(*interfaceFlag, ",") {
+			trimmed := strings.TrimSpace(iface)
+			if len(trimmed) == 0 {
+				continue
+			}
+			ifaces = append(ifaces, trimmed)
+		}
+	}
+
+	return ifaces
+}
+
 func browse(typee string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	fmt.Printf("Browsing for %s\n", typee)
+	ifaces := parseInterfaceFlag()
+	ifaceDesc := "all interfaces"
+	if len(ifaces) > 0 {
+		ifaceDesc = strings.Join(ifaces, ", ")
+	}
+
+	fmt.Printf("Browsing for %s at %s\n", typee, ifaceDesc)
 	fmt.Printf("DATE: –––%s–––\n", time.Now().Format("Mon Jan 2 2006"))
 	fmt.Printf("%s  ...STARTING...\n", time.Now().Format(timeFormat))
 	fmt.Printf("Timestamp	A/R	if Domain	Service Type	Instance Name\n")
@@ -156,7 +178,7 @@ func browse(typee string) {
 		fmt.Printf("%s	Rmv	%s	%s	%s	%s\n", time.Now().Format(timeFormat), e.IfaceName, e.Domain, e.Type, e.Name)
 	}
 
-	if err := dnssd.LookupType(ctx, typee, addFn, rmvFn); err != nil {
+	if err := dnssd.LookupTypeAtInterfaces(ctx, typee, addFn, rmvFn, ifaces...); err != nil {
 		fmt.Println(err)
 		return
 	}
