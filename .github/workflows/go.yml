@@ -6,7 +6,7 @@ name: Go
 on: 
  push:
   tags:
-   - v*
+   - v*.*.*
  
 defaults:
  run:
@@ -16,7 +16,7 @@ jobs:
   Build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
     - run: git config --global core.autocrlf input
