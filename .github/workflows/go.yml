@@ -22,7 +22,9 @@ jobs:
     - run: git config --global core.autocrlf input
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
-      
+      with:
+        go-version: 'stable'
+        
     - name: Install dnssd
       run: |
         export GOPATH=`pwd`/dnssd
