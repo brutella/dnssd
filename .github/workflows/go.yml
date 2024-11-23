@@ -26,7 +26,7 @@ jobs:
     - name: Install dnssd
       run: |
         export GOPATH=`pwd`/dnssd
-        go install github.com/brutella/dnssd/cmd/dnssd@latest
+        go install github.com/brutella/dnssd/cmd/dnssd@$GITHUB_REF_NAME
         cd dnssd/bin
         mv dnssd dnssd-${{ runner.os }}
 
