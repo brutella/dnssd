@@ -6,7 +6,7 @@ name: Go
 on: 
  push:
   tags:
-   - "v*.*.*"
+   - v*
  
 defaults:
  run:
