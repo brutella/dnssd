@@ -116,9 +116,11 @@ type MDNSConn interface {
 }
 
 type mdnsConn struct {
-	ipv4 *ipv4.PacketConn
-	ipv6 *ipv6.PacketConn
-	ch   chan *Request
+	ipv4     *ipv4.PacketConn
+	ipv6     *ipv6.PacketConn
+	udpConn4 *net.UDPConn
+	udpConn6 *net.UDPConn
+	ch       chan *Request
 }
 
 // NewMDNSConn returns a new mdns connection.
@@ -169,58 +171,59 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 	var connIPv4 *ipv4.PacketConn
 	var connIPv6 *ipv6.PacketConn
 
-	if conn, err := net.ListenUDP("udp4", AddrIPv4LinkLocalMulticast); err != nil {
+	conn4, err := net.ListenUDP("udp4", AddrIPv4LinkLocalMulticast)
+	if err != nil {
 		errs = append(errs, err)
-	} else {
-		connIPv4 = ipv4.NewPacketConn(conn)
-		if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
-			log.Debug.Printf("IPv4 interface socket opt: %v", err)
-		}
-		// Enable multicast loopback to receive all sent data
-		if err := connIPv4.SetMulticastLoopback(true); err != nil {
-			log.Debug.Println("IPv4 set multicast loopback:", err)
-		}
-		// Set TTL to 255 (rfc6762)
-		if err := connIPv4.SetTTL(255); err != nil {
-			log.Debug.Println("IPv4 set TTL:", err)
-		}
-		if err := connIPv4.SetMulticastTTL(255); err != nil {
-			log.Debug.Println("IPv4 set multicast TTL:", err)
-		}
+	}
 
-		for _, iface := range MulticastInterfaces(ifs...) {
-			if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
-				log.Debug.Printf("Failed joining IPv4 %v: %v", iface.Name, err)
-			} else {
-				log.Debug.Printf("Joined IPv4 %v", iface.Name)
-			}
+	connIPv4 = ipv4.NewPacketConn(conn4)
+	if err := connIPv4.SetControlMessage(ipv4.FlagInterface, true); err != nil {
+		log.Debug.Printf("IPv4 interface socket opt: %v", err)
+	}
+	// Enable multicast loopback to receive all sent data
+	if err := connIPv4.SetMulticastLoopback(true); err != nil {
+		log.Debug.Println("IPv4 set multicast loopback:", err)
+	}
+	// Set TTL to 255 (rfc6762)
+	if err := connIPv4.SetTTL(255); err != nil {
+		log.Debug.Println("IPv4 set TTL:", err)
+	}
+	if err := connIPv4.SetMulticastTTL(255); err != nil {
+		log.Debug.Println("IPv4 set multicast TTL:", err)
+	}
+
+	for _, iface := range MulticastInterfaces(ifs...) {
+		if err := connIPv4.JoinGroup(iface, &net.UDPAddr{IP: IPv4LinkLocalMulticast}); err != nil {
+			log.Debug.Printf("Failed joining IPv4 %v: %v", iface.Name, err)
+		} else {
+			log.Debug.Printf("Joined IPv4 %v", iface.Name)
 		}
 	}
 
-	if conn, err := net.ListenUDP("udp6", AddrIPv6LinkLocalMulticast); err != nil {
+	conn6, err := net.ListenUDP("udp6", AddrIPv6LinkLocalMulticast)
+	if err != nil {
 		errs = append(errs, err)
-	} else {
-		connIPv6 = ipv6.NewPacketConn(conn)
-		if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
-			log.Debug.Printf("IPv6 interface socket opt: %v", err)
-		}
-		// Enable multicast loopback to receive all sent data
-		if err := connIPv6.SetMulticastLoopback(true); err != nil {
-			log.Debug.Println("IPv6 set multicast loopback:", err)
-		}
-		// Set TTL to 255 (rfc6762)
-		if err := connIPv6.SetHopLimit(255); err != nil {
-			log.Debug.Println("IPv4 set TTL:", err)
-		}
-		if err := connIPv6.SetMulticastHopLimit(255); err != nil {
-			log.Debug.Println("IPv4 set multicast TTL:", err)
-		}
-		for _, iface := range MulticastInterfaces(ifs...) {
-			if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
-				log.Debug.Printf("Failed joining IPv6 %v: %v", iface.Name, err)
-			} else {
-				log.Debug.Printf("Joined IPv6 %v", iface.Name)
-			}
+	}
+	connIPv6 = ipv6.NewPacketConn(conn6)
+	if err := connIPv6.SetControlMessage(ipv6.FlagInterface, true); err != nil {
+		log.Debug.Printf("IPv6 interface socket opt: %v", err)
+	}
+	// Enable multicast loopback to receive all sent data
+	if err := connIPv6.SetMulticastLoopback(true); err != nil {
+		log.Debug.Println("IPv6 set multicast loopback:", err)
+	}
+	// Set TTL to 255 (rfc6762)
+	if err := connIPv6.SetHopLimit(255); err != nil {
+		log.Debug.Println("IPv4 set TTL:", err)
+	}
+	if err := connIPv6.SetMulticastHopLimit(255); err != nil {
+		log.Debug.Println("IPv4 set multicast TTL:", err)
+	}
+	for _, iface := range MulticastInterfaces(ifs...) {
+		if err := connIPv6.JoinGroup(iface, &net.UDPAddr{IP: IPv6LinkLocalMulticast}); err != nil {
+			log.Debug.Printf("Failed joining IPv6 %v: %v", iface.Name, err)
+		} else {
+			log.Debug.Printf("Joined IPv6 %v", iface.Name)
 		}
 	}
 
@@ -229,9 +232,11 @@ func newMDNSConn(ifs ...string) (*mdnsConn, error) {
 	}
 
 	return &mdnsConn{
-		ipv4: connIPv4,
-		ipv6: connIPv6,
-		ch:   make(chan *Request),
+		ipv4:     connIPv4,
+		ipv6:     connIPv6,
+		udpConn4: conn4,
+		udpConn6: conn6,
+		ch:       make(chan *Request),
 	}, nil
 }
 
@@ -243,6 +248,14 @@ func (c *mdnsConn) close() {
 	if c.ipv6 != nil {
 		c.ipv6.Close()
 	}
+
+	if c.udpConn4 != nil {
+		c.udpConn4.Close()
+	}
+
+	if c.udpConn6 != nil {
+		c.udpConn6.Close()
+	}
 }
 
 func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
@@ -253,7 +266,7 @@ func (c *mdnsConn) read(ctx context.Context) <-chan *Request {
 func (c *mdnsConn) readInto(ctx context.Context, ch chan *Request) {
 
 	isDone := func(ctx context.Context) bool {
-		return ctx.Err() == context.Canceled
+		return ctx.Err() != nil
 	}
 
 	if c.ipv4 != nil {
