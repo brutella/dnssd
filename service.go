@@ -465,15 +465,15 @@ func hostname() string {
 }
 
 func parseHostname(str string) (name string, domain string) {
-	elems := strings.Split(str, ".")
-	if len(elems) > 0 {
-		name = elems[0]
+	trimmed := strings.Trim(str, ".")
+	last := strings.LastIndex(trimmed, ".")
+	if last == -1 {
+		name = trimmed
+		return
 	}
 
-	if len(elems) > 1 {
-		domain = elems[1]
-	}
-
+	name = strings.Trim(str[:last], ".")
+	domain = strings.Trim(str[last+1:], ".")
 	return
 }
 
