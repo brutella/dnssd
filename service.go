@@ -2,7 +2,6 @@ package dnssd
 
 import (
 	"bytes"
-
 	"github.com/brutella/dnssd/log"
 
 	"fmt"
@@ -39,18 +38,23 @@ type Config struct {
 
 	// Interfaces at which the service should be registered
 	Ifaces []string
+
+	// The addresses for the interface which should be used (A / AAAA / Both)
+	// If empty, all addresses are used.
+	AdvertiseIPType IPType
 }
 
 func (c Config) Copy() Config {
 	return Config{
-		Name:   c.Name,
-		Type:   c.Type,
-		Domain: c.Domain,
-		Host:   c.Host,
-		Text:   c.Text,
-		IPs:    c.IPs,
-		Port:   c.Port,
-		Ifaces: c.Ifaces,
+		Name:            c.Name,
+		Type:            c.Type,
+		Domain:          c.Domain,
+		Host:            c.Host,
+		Text:            c.Text,
+		IPs:             c.IPs,
+		Port:            c.Port,
+		Ifaces:          c.Ifaces,
+		AdvertiseIPType: c.AdvertiseIPType,
 	}
 }
 
@@ -97,17 +101,26 @@ func validHostname(host string) string {
 	return result
 }
 
+type IPType int
+
+const (
+	Both = IPType(0)
+	IPv4 = IPType(4)
+	IPv6 = IPType(6)
+)
+
 // Service represents a DNS-SD service instance
 type Service struct {
-	Name   string
-	Type   string
-	Domain string
-	Host   string
-	Text   map[string]string
-	TTL    time.Duration // Original time to live
-	Port   int
-	IPs    []net.IP
-	Ifaces []string
+	Name            string
+	Type            string
+	Domain          string
+	Host            string
+	Text            map[string]string
+	TTL             time.Duration // Original time to live
+	Port            int
+	IPs             []net.IP
+	Ifaces          []string
+	AdvertiseIPType IPType
 
 	// stores ips by interface name for caching purposes
 	ifaceIPs   map[string][]net.IP
@@ -162,15 +175,16 @@ func NewService(cfg Config) (s Service, err error) {
 	}
 
 	return Service{
-		Name:     trimServiceNameSuffixRight(name),
-		Type:     typ,
-		Domain:   domain,
-		Host:     validHostname(host),
-		Text:     text,
-		Port:     port,
-		IPs:      ips,
-		Ifaces:   ifaces,
-		ifaceIPs: map[string][]net.IP{},
+		Name:            trimServiceNameSuffixRight(name),
+		Type:            typ,
+		Domain:          domain,
+		Host:            validHostname(host),
+		Text:            text,
+		Port:            port,
+		IPs:             ips,
+		AdvertiseIPType: cfg.AdvertiseIPType,
+		Ifaces:          ifaces,
+		ifaceIPs:        map[string][]net.IP{},
 	}, nil
 }
 
@@ -256,17 +270,18 @@ func (s *Service) HasIPOnAnyInterface(ip net.IP) bool {
 // Copy returns a copy of the service.
 func (s Service) Copy() *Service {
 	return &Service{
-		Name:       s.Name,
-		Type:       s.Type,
-		Domain:     s.Domain,
-		Host:       s.Host,
-		Text:       s.Text,
-		TTL:        s.TTL,
-		IPs:        s.IPs,
-		Port:       s.Port,
-		Ifaces:     s.Ifaces,
-		ifaceIPs:   s.ifaceIPs,
-		expiration: s.expiration,
+		Name:            s.Name,
+		Type:            s.Type,
+		Domain:          s.Domain,
+		Host:            s.Host,
+		Text:            s.Text,
+		TTL:             s.TTL,
+		IPs:             s.IPs,
+		Port:            s.Port,
+		AdvertiseIPType: s.AdvertiseIPType,
+		Ifaces:          s.Ifaces,
+		ifaceIPs:        s.ifaceIPs,
+		expiration:      s.expiration,
 	}
 }
 
