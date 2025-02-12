@@ -147,12 +147,8 @@ func (r *responder) announceAtInterface(service *Service, iface *net.Interface) 
 	answer = append(answer, SRV(*service))
 	answer = append(answer, PTR(*service))
 	answer = append(answer, TXT(*service))
-	for _, a := range A(*service, iface) {
-		answer = append(answer, a)
-	}
-	for _, aaaa := range AAAA(*service, iface) {
-		answer = append(answer, aaaa)
-	}
+	answer = append(answer, aOrAaaaFilter(service, iface)...)
+
 	msg := new(dns.Msg)
 	msg.Answer = answer
 	msg.Response = true
@@ -390,13 +386,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		extra := []dns.RR{SRV(srv), TXT(srv)}
 
-		for _, a := range A(srv, req.iface) {
-			extra = append(extra, a)
-		}
-
-		for _, aaaa := range AAAA(srv, req.iface) {
-			extra = append(extra, aaaa)
-		}
+		extra = append(extra, aOrAaaaFilter(&srv, req.iface)...)
 
 		if nsec := NSEC(ptr, srv, req.iface); nsec != nil {
 			extra = append(extra, nsec)
@@ -414,13 +404,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 
 		var extra []dns.RR
 
-		for _, a := range A(srv, req.iface) {
-			extra = append(extra, a)
-		}
-
-		for _, aaaa := range AAAA(srv, req.iface) {
-			extra = append(extra, aaaa)
-		}
+		extra = append(extra, aOrAaaaFilter(&srv, req.iface)...)
 
 		if nsec := NSEC(SRV(srv), srv, req.iface); nsec != nil {
 			extra = append(extra, nsec)
@@ -436,13 +420,7 @@ func (r *responder) handleQuestion(q dns.Question, req *Request, srv Service) *d
 	case strings.ToLower(srv.Hostname()):
 		var answer []dns.RR
 
-		for _, a := range A(srv, req.iface) {
-			answer = append(answer, a)
-		}
-
-		for _, aaaa := range AAAA(srv, req.iface) {
-			answer = append(answer, aaaa)
-		}
+		answer = append(answer, aOrAaaaFilter(&srv, req.iface)...)
 
 		resp.Answer = answer
 
@@ -519,4 +497,26 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	}
 
 	return false
+}
+
+func aOrAaaaFilter(service *Service, iface *net.Interface) []dns.RR {
+	var result []dns.RR
+	switch service.AdvertiseIPType {
+	case IPv4:
+		for _, a := range A(*service, iface) {
+			result = append(result, a)
+		}
+	case IPv6:
+		for _, aaaa := range AAAA(*service, iface) {
+			result = append(result, aaaa)
+		}
+	default:
+		for _, a := range A(*service, iface) {
+			result = append(result, a)
+		}
+		for _, aaaa := range AAAA(*service, iface) {
+			result = append(result, aaaa)
+		}
+	}
+	return result
 }

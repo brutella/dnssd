@@ -38,50 +38,26 @@ func TestParseEscapedServiceInstanceName(t *testing.T) {
 }
 
 func TestParseHostname(t *testing.T) {
-	name, domain := parseHostname("Computer.local.")
-
-	if name != "Computer" {
-		t.Fatalf("%s != Computer", name)
+	tests := []struct {
+		Hostname string
+		Name     string
+		Domain   string
+	}{
+		{"Computer.local.", "Computer", "local"},
+		{"Computer.local", "Computer", "local"},
+		{"Computer.", "Computer", ""},
+		{"Computer", "Computer", ""},
+		{"192.168.0.1.local", "192.168.0.1", "local"},
 	}
+	for _, test := range tests {
+		name, domain := parseHostname(test.Hostname)
+		if name != test.Name {
+			t.Fatalf("%s != %s", name, test.Name)
+		}
 
-	if is, want := domain, "local"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
-}
-
-func TestParseHostnameTrailingDomain(t *testing.T) {
-	name, domain := parseHostname("Computer.local")
-
-	if name != "Computer" {
-		t.Fatalf("%s != Computer", name)
-	}
-
-	if is, want := domain, "local"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
-}
-
-func TestParseHostnameWithoutDomain(t *testing.T) {
-	name, domain := parseHostname("Computer.")
-
-	if is, want := name, "Computer"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
-
-	if is, want := domain, ""; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
-}
-
-func TestParseHostnameWithoutTrailingDot(t *testing.T) {
-	name, domain := parseHostname("Computer")
-
-	if is, want := name, "Computer"; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
-	}
-
-	if is, want := domain, ""; is != want {
-		t.Fatalf("is=%v want=%v", is, want)
+		if domain != test.Domain {
+			t.Fatalf("%s != %s", domain, test.Domain)
+		}
 	}
 }
 
