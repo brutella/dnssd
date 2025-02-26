@@ -194,9 +194,6 @@ func probeQuery(service Service, iface *net.Interface) *Query {
 		Qclass: dns.ClassINET,
 	}
 
-	setQuestionUnicast(&instanceQ)
-	setQuestionUnicast(&hostQ)
-
 	msg.Question = []dns.Question{instanceQ, hostQ}
 
 	srv := SRV(service)
