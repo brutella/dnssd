@@ -32,7 +32,9 @@ func (c *Cache) Services() []*Service {
 // UpdateFrom updates the cache from resource records in msg.
 // TODO consider the cache-flush bit to make records as to be deleted in one second
 func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
-	answers := filterRecords(req, nil)
+	var answers []dns.RR
+	answers = append(answers, req.msg.Answer...)
+	answers = append(answers, req.msg.Extra...)
 	sort.Sort(byType(answers))
 
 	for _, answer := range answers {
