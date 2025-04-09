@@ -6,7 +6,9 @@ import (
 
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
+	"time"
 )
 
 // BrowseEntry represents a discovered service instance.
@@ -35,7 +37,7 @@ func LookupType(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (
 	}
 	defer conn.close()
 
-	return lookupType(ctx, service, conn, add, rmv)
+	return lookupType(ctx, service, conn, add, rmv, false)
 }
 
 // LookupTypeAtInterface browses for service instances at specific network interfaces.
@@ -46,7 +48,18 @@ func LookupTypeAtInterfaces(ctx context.Context, service string, add AddFunc, rm
 	}
 	defer conn.close()
 
-	return lookupType(ctx, service, conn, add, rmv, ifaces...)
+	return lookupType(ctx, service, conn, add, rmv, false, ifaces...)
+}
+
+// LookupTypeContinuously brwoses for service instances using Continuous Multicast DNS Querying
+func LookupTypeContinuously(ctx context.Context, service string, add AddFunc, rmv RmvFunc) (err error) {
+	conn, err := newMDNSConn()
+	if err != nil {
+		return err
+	}
+	defer conn.close()
+
+	return lookupType(ctx, service, conn, add, rmv, true)
 }
 
 // ServiceInstanceName returns the service instance name
@@ -62,20 +75,17 @@ func (e BrowseEntry) ServiceInstanceName() string {
 	return fmt.Sprintf("%s.%s.%s.", e.Name, e.Type, e.Domain)
 }
 
-func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc, ifaces ...string) (err error) {
+func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc, rmv RmvFunc, continuous bool, ifaces ...string) (err error) {
 	var cache = NewCache()
 
 	m := new(dns.Msg)
 	m.Question = []dns.Question{
-		dns.Question{
+		{
 			Name:   service,
 			Qtype:  dns.TypePTR,
 			Qclass: dns.ClassINET,
 		},
 	}
-	// TODO include known answers which current ttl is more than half of the correct ttl (see TFC6772 7.1: Known-Answer Supression)
-	// m.Answer = ...
-	// m.Authoritive = false // because our answers are *believes*
 
 	readCtx, readCancel := context.WithCancel(ctx)
 	defer readCancel()
@@ -84,10 +94,39 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 
 	qs := make(chan *Query)
 	go func() {
-		for _, iface := range MulticastInterfaces(ifaces...) {
-			iface := iface
-			q := &Query{msg: m, iface: iface}
-			qs <- q
+		query := func() {
+			for _, iface := range MulticastInterfaces(ifaces...) {
+				iface := iface
+				q := &Query{msg: m.Copy(), iface: iface}
+				qs <- q
+			}
+		}
+
+		if continuous {
+			// Add random delay（between 20ms and 120ms）for first query
+			time.Sleep(time.Duration(rand.Intn(100)+20) * time.Millisecond)
+
+			counter := 0
+			for {
+				query()
+
+				// Exponential backoff: increase the interval
+				interval := time.Duration((1 << counter) * time.Second)
+				if interval >= 60*time.Minute {
+					// Cap the interval to 60 minutes
+					interval = 60 * time.Minute
+				}
+
+				select {
+				case <-time.After(interval):
+					counter += 1
+
+				case <-ctx.Done():
+					return
+				}
+			}
+		} else {
+			query()
 		}
 	}()
 
@@ -96,6 +135,20 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 		select {
 		case q := <-qs:
 			log.Debug.Printf("Send browsing query at %s\n%s\n", q.IfaceName(), q.msg)
+			if continuous {
+				// Known-Answer Supression
+				answer := make([]dns.RR, 0)
+				for _, srv := range cache.Services() {
+					if srv.ServiceName() != service {
+						continue
+					}
+
+					if time.Until(srv.expiration) > srv.TTL/2 {
+						answer = append(answer, PTR(*srv))
+					}
+				}
+				q.msg.Answer = answer
+			}
 			if err := conn.SendQuery(q); err != nil {
 				log.Debug.Println("SendQuery:", err)
 			}
