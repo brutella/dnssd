@@ -11,8 +11,9 @@ defaults:
 
 jobs:
   Build-x86_64:
-    matrix:
-      os: [windows-latest, ubuntu-latest]
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
     - run: git config --global core.autocrlf input
