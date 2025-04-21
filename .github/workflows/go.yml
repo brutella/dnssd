@@ -70,6 +70,8 @@ jobs:
     - name: Download go
       run: curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz
 
+    - run: ls -l; pwd
+
     - name: build dnssd
       uses: uraimo/run-on-arch-action@v3.0.1
       with:
@@ -91,6 +93,7 @@ jobs:
           # apt-get install -q -y go
         run: |
           cd /project
+          ls -l
           tar xfz go*.tar.gz
           export PATH=$PATH:/project/go/bin
 
