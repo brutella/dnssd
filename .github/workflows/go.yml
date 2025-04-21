@@ -75,7 +75,7 @@ jobs:
         curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz -o go1.24.2.linux-arm64.tar.gz
         tar xfz go*.tar.gz
     - name: Download go mod
-      run: GOPATH=`pwd`/MYGOPATH go download mod
+      run: GOPATH=`pwd`/MYGOPATH go mod download
 
     - name: build dnssd
       uses: uraimo/run-on-arch-action@v3.0.1
