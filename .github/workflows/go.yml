@@ -87,6 +87,7 @@ jobs:
           runner_os: ${{ runner.os }}
 
         install: |
+          cd /project
           tar zfx go*.tar.gz
           # apt-get update -q -y
           # apt-get install -q -y go
