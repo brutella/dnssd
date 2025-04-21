@@ -18,6 +18,8 @@ jobs:
     steps:
     - run: git config --global core.autocrlf input
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
     - uses: actions/setup-go@v5
       with:
         go-version: 'stable'
@@ -40,6 +42,8 @@ jobs:
     steps:
     - run: git config --global core.autocrlf input
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
     - uses: actions/setup-go@v5
       with:
         go-version: 'stable'
@@ -63,6 +67,8 @@ jobs:
     steps:
     - run: git config --global core.autocrlf input
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
 
     - name: Download go
       run: curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz
