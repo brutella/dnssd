@@ -66,11 +66,16 @@ jobs:
     - uses: actions/checkout@v4
       with:
         ref: ${{ github.ref_name }}
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
 
-    - name: Download go
-      run: curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz -o go1.24.2.linux-arm64.tar.gz
-
-    - run: ls -l; pwd
+    - name: Download aarch64 version of go
+      run: |
+        curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz -o go1.24.2.linux-arm64.tar.gz
+        tar xfz go*.tar.gz
+    - name: Download go mod
+      run: GOPATH=`pwd`/MYGOPATH go download mod
 
     - name: build dnssd
       uses: uraimo/run-on-arch-action@v3.0.1
@@ -88,18 +93,17 @@ jobs:
         env: |
           runner_os: ${{ runner.os }}
 
-        # install: |
-          # apt-get update -q -y
-          # apt-get install -q -y go
         run: |
           cd /project
-          ls -l
-          tar xfz go*.tar.gz
+
           export PATH=$PATH:/project/go/bin
+          export GOPATH=/project/MYGOPATH
 
           cd /project/cmd/dnssd
+
           mkdir bin
           go build -o bin .
+
           mv bin/dnssd bin/dnssd-${runner_os}-aarch64
 
     - name: Upload artifact
