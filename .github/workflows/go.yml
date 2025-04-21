@@ -10,56 +10,33 @@ defaults:
   shell: bash
 
 jobs:
-  # Build-windows:
-  #   runs-on: windows-latest
-  #   steps:
-  #   - run: git config --global core.autocrlf input
-  #   - uses: actions/checkout@v4
-  #     with:
-  #       ref: ${{ github.ref_name }}
-  #   - uses: actions/setup-go@v5
-  #     with:
-  #       go-version: 'stable'
+  Build-x86_64:
+    matrix:
+      os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - run: git config --global core.autocrlf input
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
 
-  #   - name: build dnssd
-  #     run: |
-  #       cd cmd/dnssd
-  #       mkdir bin
-  #       go build -o bin .
-  #       mv bin/dnssd bin/dnssd-windows-x86
+    - name: build dnssd
+      run: |
+        cd cmd/dnssd
+        mkdir bin
+        go build -o bin .
+        mv bin/dnssd bin/dnssd-${{ runner.os }}-x86_64
 
-  #   - name: Upload artifact
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: dnssd-windows-x86
-  #       path: cmd/dnssd/bin/dnssd*
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dnssd-${{ runner.os }}-x86_64
+        path: cmd/dnssd/bin/dnssd*
 
-  # Build-linux-x86_64:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - run: git config --global core.autocrlf input
-  #   - uses: actions/checkout@v4
-  #     with:
-  #       ref: ${{ github.ref_name }}
-  #   - uses: actions/setup-go@v5
-  #     with:
-  #       go-version: 'stable'
-
-  #   - name: build dnssd
-  #     run: |
-  #       cd cmd/dnssd
-  #       mkdir bin
-  #       go build -o bin .
-  #       mv bin/dnssd bin/dnssd-${{ runner.os }}-x86_64
-
-  #   - name: Upload artifact
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: dnssd-${{ runner.os }}-x86_64
-  #       path: cmd/dnssd/bin/dnssd*
-
-
-  Build-linux-aarch64:
+  Build-Linux-aarch64:
     runs-on: ubuntu-latest
     steps:
     - run: git config --global core.autocrlf input
@@ -115,9 +92,8 @@ jobs:
   Upload:
     runs-on: ubuntu-latest
     needs:
-      # - Build-windows
-      # - Build-linux-x86_64
-      - Build-linux-aarch64
+      - Build-x86_64
+      - Build-Linux-aarch64
     if: ${{ github.ref_type == 'tag' }}
     steps:
     - name: Download All Artifacts
