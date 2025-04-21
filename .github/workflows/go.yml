@@ -3,44 +3,106 @@
 
 name: Go
 
-on: 
+on:
  push:
   tags:
    - v*.*.*
- 
+
 defaults:
  run:
   shell: bash
-  
-jobs: 
-  Build:
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+
+jobs:
+  Build-windows:
+    runs-on: windows-latest
     steps:
     - run: git config --global core.autocrlf input
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
         go-version: 'stable'
-        
+
     - name: build dnssd
       run: |
         cd cmd/dnssd
         mkdir bin
         go build -o bin .
-        mv bin/dnssd bin/dnssd-${{ runner.os }}
-        
+        mv bin/dnssd bin/dnssd-windows-x86
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: dnssd-${{ runner.os }}
+        name: dnssd-windows-x86
+        path: cmd/dnssd/bin/dnssd*
+
+  Build-linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+    - run: git config --global core.autocrlf input
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+
+    - name: build dnssd
+      run: |
+        cd cmd/dnssd
+        mkdir bin
+        go build -o bin .
+        mv bin/dnssd bin/dnssd-${{ runner.os }}-x86_64
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dnssd-${{ runner.os }}-x86_64
+        path: cmd/dnssd/bin/dnssd*
+
+
+  Build-linux-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+    - run: git config --global core.autocrlf input
+    - uses: actions/checkout@v4
+
+    - name: Download go
+    - run: curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz
+
+    - name: build dnssd
+      uses: uraimo/run-on-arch-action@v3.0.1
+      with:
+        arch: aarch64
+        distro: ubuntu_latest
+        setup: |
+          mkdir -p "${PWD}/artifacts"
+
+        githubToken: ${{ github.token }}
+
+        dockerRunArgs: |
+          --volume "${PWD}:/project"
+
+        env: |
+          runner_os: ${{ runner.os }}
+
+        install: |
+          tar zfx go*.tar.gz
+          # apt-get update -q -y
+          # apt-get install -q -y go
+        run: |
+          cd /project/cmd/dnssd
+          export PATH=$PATH:`pwd`/go/bin
+          mkdir bin
+          go build -o bin .
+          mv bin/dnssd bin/dnssd-${runner_os}-aarch64
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dnssd-${{ runner.os }}-aarch64
         path: cmd/dnssd/bin/dnssd*
 
   Upload:
     runs-on: ubuntu-latest
-    needs: Build
+    needs: [Build-windows, Build-linux-x86_64, Build-linux-aarch64]
     steps:
     - name: Download All Artifacts
       uses: actions/download-artifact@v4
