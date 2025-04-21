@@ -10,10 +10,10 @@ defaults:
   shell: bash
 
 jobs:
-  Build-x86_64:
+  Build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
     - run: git config --global core.autocrlf input
@@ -29,72 +29,18 @@ jobs:
         cd cmd/dnssd
         mkdir bin
         go build -o bin .
-        mv bin/dnssd bin/dnssd-${{ runner.os }}-x86_64
+        mv bin/dnssd bin/dnssd-${{ runner.os }}-${{ runner.arch }}
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: dnssd-${{ runner.os }}-x86_64
-        path: cmd/dnssd/bin/dnssd*
-
-  Build-Linux-aarch64:
-    runs-on: ubuntu-latest
-    steps:
-    - run: git config --global core.autocrlf input
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref_name }}
-    - uses: actions/setup-go@v5
-      with:
-        go-version: 'stable'
-
-    - name: Download aarch64 version of go
-      run: |
-        curl -Lf https://go.dev/dl/go1.24.2.linux-arm64.tar.gz -o go1.24.2.linux-arm64.tar.gz
-        tar xfz go*.tar.gz
-    - name: Download go mod
-      run: GOPATH=`pwd`/MYGOPATH go mod download
-
-    - name: build dnssd
-      uses: uraimo/run-on-arch-action@v3.0.1
-      with:
-        arch: aarch64
-        distro: ubuntu_latest
-        setup: |
-          mkdir -p "${PWD}/artifacts"
-
-        githubToken: ${{ github.token }}
-
-        dockerRunArgs: |
-          --volume "${PWD}:/project"
-
-        env: |
-          runner_os: ${{ runner.os }}
-
-        run: |
-          cd /project
-
-          export PATH=$PATH:/project/go/bin
-          export GOPATH=/project/MYGOPATH
-
-          cd /project/cmd/dnssd
-
-          mkdir bin
-          go build -o bin .
-
-          mv bin/dnssd bin/dnssd-${runner_os}-aarch64
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: dnssd-${{ runner.os }}-aarch64
+        name: dnssd-${{ runner.os }}-${{ runner.arch }}
         path: cmd/dnssd/bin/dnssd*
 
   Upload:
     runs-on: ubuntu-latest
     needs:
-      - Build-x86_64
-      - Build-Linux-aarch64
+      - Build
     if: ${{ github.ref_type == 'tag' }}
     steps:
     - name: Download All Artifacts
