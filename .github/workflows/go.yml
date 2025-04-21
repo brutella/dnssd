@@ -86,14 +86,15 @@ jobs:
         env: |
           runner_os: ${{ runner.os }}
 
-        install: |
-          cd /project
-          tar zfx go*.tar.gz
+        # install: |
           # apt-get update -q -y
           # apt-get install -q -y go
         run: |
+          cd /project
+          tar xfz go*.tar.gz
+          export PATH=$PATH:/project/go/bin
+
           cd /project/cmd/dnssd
-          export PATH=$PATH:`pwd`/go/bin
           mkdir bin
           go build -o bin .
           mv bin/dnssd bin/dnssd-${runner_os}-aarch64
