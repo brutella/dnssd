@@ -196,18 +196,9 @@ func TestBlockedIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(ifaces) == 0 {
-		t.Fatal("no network interfaces")
-	}
-
 	// Use a random network interface
-	iface := ifaces[0]
-	if is, want := s.IPsAtInterface(&iface), []net.IP{net.IPv4(192, 168, 0, 10)}; reflect.DeepEqual(is, want) {
+	iface := &net.Interface{Name: "dummy"}
+	if is, want := s.IPsAtInterface(iface), []net.IP{net.IPv4(192, 168, 0, 10)}; !reflect.DeepEqual(is, want) {
 		t.Fatalf("%v != %v", is, want)
 	}
 }

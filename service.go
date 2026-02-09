@@ -180,6 +180,16 @@ func NewService(cfg Config) (s Service, err error) {
 		ifaces = cfg.Ifaces
 	}
 
+	blocked := make([]*net.IPNet, len(cfg.BlockedIPNets))
+	for i, str := range cfg.BlockedIPNets {
+		if _, ipNet, netErr := net.ParseCIDR(str); err != nil {
+			err = netErr
+			return
+		} else {
+			blocked[i] = ipNet
+		}
+	}
+
 	return Service{
 		Name:            trimServiceNameSuffixRight(name),
 		Type:            typ,
@@ -188,6 +198,7 @@ func NewService(cfg Config) (s Service, err error) {
 		Text:            text,
 		Port:            port,
 		IPs:             ips,
+		Blocked:         blocked,
 		AdvertiseIPType: cfg.AdvertiseIPType,
 		Ifaces:          ifaces,
 		ifaceIPs:        map[string][]net.IP{},
