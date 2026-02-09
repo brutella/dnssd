@@ -297,6 +297,7 @@ func (s Service) Copy() *Service {
 		Port:            s.Port,
 		AdvertiseIPType: s.AdvertiseIPType,
 		Ifaces:          s.Ifaces,
+		Blocked:         s.Blocked,
 		ifaceIPs:        s.ifaceIPs,
 		expiration:      s.expiration,
 	}
