@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"net"
+	"reflect"
 	"testing"
 )
 
@@ -179,5 +180,34 @@ func TestTrimServiceNameSuffixRight(t *testing.T) {
 		if is, want := trimServiceNameSuffixRight(test.Name), test.Expected; is != want {
 			t.Fatalf("is=%v want=%v (%+v)", is, want, test)
 		}
+	}
+}
+
+func TestBlockedIPs(t *testing.T) {
+	cfg := Config{
+		Name:          "My Service",
+		Type:          "_hap._tcp",
+		Port:          12345,
+		IPs:           []net.IP{net.IPv4(192, 168, 0, 1), net.IPv4(192, 168, 0, 10)},
+		BlockedIPNets: []string{"192.168.0.1/32"},
+	}
+	s, err := NewService(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ifaces) == 0 {
+		t.Fatal("no network interfaces")
+	}
+
+	// Use a random network interface
+	iface := ifaces[0]
+	if is, want := s.IPsAtInterface(&iface), []net.IP{net.IPv4(192, 168, 0, 10)}; reflect.DeepEqual(is, want) {
+		t.Fatalf("%v != %v", is, want)
 	}
 }
