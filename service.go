@@ -2,6 +2,7 @@ package dnssd
 
 import (
 	"bytes"
+
 	"github.com/brutella/dnssd/log"
 
 	"fmt"
@@ -39,6 +40,9 @@ type Config struct {
 	// Interfaces at which the service should be registered
 	Ifaces []string
 
+	// BlockedIPNets contains the blocked ip networks.
+	BlockedIPNets []string
+
 	// The addresses for the interface which should be used (A / AAAA / Both)
 	// If empty, all addresses are used.
 	AdvertiseIPType IPType
@@ -54,6 +58,7 @@ func (c Config) Copy() Config {
 		IPs:             c.IPs,
 		Port:            c.Port,
 		Ifaces:          c.Ifaces,
+		BlockedIPNets:   c.BlockedIPNets,
 		AdvertiseIPType: c.AdvertiseIPType,
 	}
 }
@@ -120,6 +125,7 @@ type Service struct {
 	Port            int
 	IPs             []net.IP
 	Ifaces          []string
+	Blocked         []*net.IPNet
 	AdvertiseIPType IPType
 
 	// stores ips by interface name for caching purposes
@@ -174,6 +180,16 @@ func NewService(cfg Config) (s Service, err error) {
 		ifaces = cfg.Ifaces
 	}
 
+	blocked := make([]*net.IPNet, len(cfg.BlockedIPNets))
+	for i, str := range cfg.BlockedIPNets {
+		if _, ipNet, netErr := net.ParseCIDR(str); err != nil {
+			err = netErr
+			return
+		} else {
+			blocked[i] = ipNet
+		}
+	}
+
 	return Service{
 		Name:            trimServiceNameSuffixRight(name),
 		Type:            typ,
@@ -182,6 +198,7 @@ func NewService(cfg Config) (s Service, err error) {
 		Text:            text,
 		Port:            port,
 		IPs:             ips,
+		Blocked:         blocked,
 		AdvertiseIPType: cfg.AdvertiseIPType,
 		Ifaces:          ifaces,
 		ifaceIPs:        map[string][]net.IP{},
@@ -228,11 +245,11 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 	}
 
 	if ips, ok := s.ifaceIPs[iface.Name]; ok {
-		return ips
+		return s.filterIPs(ips)
 	}
 
 	if len(s.IPs) > 0 {
-		return s.IPs
+		return s.filterIPs(s.IPs)
 	}
 
 	addrs, err := iface.Addrs()
@@ -242,7 +259,7 @@ func (s *Service) IPsAtInterface(iface *net.Interface) []net.IP {
 
 	ips := []net.IP{}
 	for _, addr := range addrs {
-		if ip, _, err := net.ParseCIDR(addr.String()); err == nil {
+		if ip, _, err := net.ParseCIDR(addr.String()); err == nil && !s.blocks(ip) {
 			ips = append(ips, ip)
 		} else {
 			log.Debug.Println(err)
@@ -280,6 +297,7 @@ func (s Service) Copy() *Service {
 		Port:            s.Port,
 		AdvertiseIPType: s.AdvertiseIPType,
 		Ifaces:          s.Ifaces,
+		Blocked:         s.Blocked,
 		ifaceIPs:        s.ifaceIPs,
 		expiration:      s.expiration,
 	}
@@ -287,6 +305,29 @@ func (s Service) Copy() *Service {
 
 func (s Service) EscapedName() string {
 	return escape.Replace(s.Name)
+}
+
+// Removes blocked ip addresses from the list of addresses.
+func (s *Service) filterIPs(ips []net.IP) []net.IP {
+	var tmp []net.IP
+	for _, ip := range ips {
+		if !s.blocks(ip) {
+			tmp = append(tmp, ip)
+		}
+	}
+
+	return tmp
+}
+
+// Return `true` if the ip address is blocked for this service.
+func (s *Service) blocks(ip net.IP) bool {
+	for _, ipNet := range s.Blocked {
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func incrementHostname(name string, count int) string {
