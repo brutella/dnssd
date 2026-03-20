@@ -2,6 +2,8 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/brutella/dnssd"
 	"github.com/brutella/dnssd/log"
 
@@ -16,6 +18,27 @@ import (
 	"time"
 )
 
+type recordSet struct {
+	records map[string]string
+}
+
+func newRecordSet() recordSet {
+	return recordSet{records: make(map[string]string)}
+}
+
+func (s recordSet) String() string {
+	return fmt.Sprint(s.records)
+}
+
+func (r recordSet) Set(txt string) error {
+	key, value, ok := strings.Cut(txt, "=")
+	if !ok {
+		return errors.New(`value must be of the form "key=value"`)
+	}
+	r.records[key] = value
+	return nil
+}
+
 var nameFlag = flag.String("Name", "", "Service Name")
 var typeFlag = flag.String("Type", "", "Service type")
 var domainFlag = flag.String("Domain", "local", "Service Domain")
@@ -25,14 +48,20 @@ var portFlag = flag.Int("Port", 0, "")
 var interfaceFlag = flag.String("Interface", "", "")
 var timeFormat = "15:04:05.000"
 var verboseFlag = flag.Bool("Verbose", false, "Verbose logging")
+var txtRecords = newRecordSet()
 
 // Name of the invoked executable.
 var name = filepath.Base(os.Args[0])
 
+// Handle multiple args for TXT records
+func registerTxtFlag() {
+	flag.Var(&txtRecords, "Txt", "can be used multiple times")
+}
+
 func printUsage() {
 	log.Info.Println("A DNS-SD utilty to register, browse and resolve Bonjour services.\n\n" +
 		"Usage:\n" +
-		"  " + name + " register -Name <string> -Type <string> -Port <int> [-Domain <string> -Interface <string[,string]> -Host <string> -IP <string>]\n" +
+		"  " + name + " register -Name <string> -Type <string> -Port <int> [-Domain <string> -Interface <string[,string]> -Txt <string=string>... -Host <string> -IP <string>]\n" +
 		"  " + name + " browse                  -Type <string>             [-Domain <string> -Interface <string[,string]>]\n" +
 		"  " + name + " resolve  -Name <string> -Type <string>             [-Domain <string> -Interface <string[,string]>]\n")
 }
@@ -109,6 +138,7 @@ func register(instance string) {
 			Ifaces: parseInterfaceFlag(),
 			IPs:    ips,
 			Host:   *hostFlag,
+			Text:   txtRecords.records,
 		}
 		srv, err := dnssd.NewService(cfg)
 		if err != nil {
@@ -196,6 +226,8 @@ func main() {
 		printUsage()
 		return
 	}
+
+	registerTxtFlag()
 
 	// The first argument is the command.
 	cmd := args[0]
