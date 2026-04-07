@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 )
 
 // BrowseEntry represents a discovered service instance.
@@ -91,6 +92,31 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 		}
 	}()
 
+	refreshTimer := time.NewTimer(time.Hour)
+	refreshTimer.Stop()
+
+	sendRefreshQuery := func() {
+		for _, iface := range MulticastInterfaces(ifaces...) {
+			q := &Query{msg: m, iface: iface}
+			if err := conn.SendQuery(q); err != nil {
+				log.Debug.Println("RefreshQuery:", err)
+			}
+		}
+	}
+
+	resetRefreshTimer := func() {
+		exp := cache.EarliestExpiration()
+		if exp.IsZero() {
+			refreshTimer.Stop()
+			return
+		}
+		remaining := time.Until(exp)
+		refreshAt := time.Duration(float64(remaining) * 0.8)
+		if refreshAt > 0 {
+			refreshTimer.Reset(refreshAt)
+		}
+	}
+
 	es := []*BrowseEntry{}
 	for {
 		select {
@@ -100,9 +126,13 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 				log.Debug.Println("SendQuery:", err)
 			}
 
+		case <-refreshTimer.C:
+			sendRefreshQuery()
+
 		case req := <-ch:
 			log.Debug.Printf("Receive message at %s\n%s\n", req.IfaceName(), req.msg)
 			cache.UpdateFrom(req)
+			resetRefreshTimer()
 			for _, srv := range cache.Services() {
 				if srv.ServiceName() != service {
 					continue

@@ -11,12 +11,31 @@ import (
 // Cache stores services in memory.
 type Cache struct {
 	services map[string]*Service
+	earliestExpiry time.Time
 }
 
 // NewCache returns a new in-memory cache.
 func NewCache() *Cache {
 	return &Cache{
 		services: make(map[string]*Service),
+	}
+}
+
+// EarliestExpiration returns the earliest expiration time across all cached services.
+func (c *Cache) EarliestExpiration() time.Time {
+	return c.earliestExpiry
+}
+
+func (c *Cache) updateEarliestExpiry(exp time.Time) {
+	if c.earliestExpiry.IsZero() || exp.Before(c.earliestExpiry) {
+		c.earliestExpiry = exp
+	}
+}
+
+func (c *Cache) recalcEarliestExpiry() {
+	c.earliestExpiry = time.Time{}
+	for _, srv := range c.services {
+		c.updateEarliestExpiry(srv.expiration)
 	}
 }
 
@@ -55,6 +74,7 @@ func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
 
 			entry.TTL = ttl
 			entry.expiration = time.Now().Add(ttl)
+			c.updateEarliestExpiry(entry.expiration)
 
 		case *dns.SRV:
 			ttl := time.Duration(rr.Hdr.Ttl) * time.Second
@@ -74,6 +94,7 @@ func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
 			entry.SetHostname(rr.Target)
 			entry.TTL = ttl
 			entry.expiration = time.Now().Add(ttl)
+			c.updateEarliestExpiry(entry.expiration)
 			entry.Port = int(rr.Port)
 
 		case *dns.A:
@@ -112,6 +133,7 @@ func (c *Cache) UpdateFrom(req *Request) (adds []*Service, rmvs []*Service) {
 				entry.Text = text
 				entry.TTL = time.Duration(rr.Hdr.Ttl) * time.Second
 				entry.expiration = time.Now().Add(entry.TTL)
+				c.updateEarliestExpiry(entry.expiration)
 			}
 		default:
 			// ignore
@@ -132,6 +154,10 @@ func (c *Cache) removeExpired() []*Service {
 			outdated = append(outdated, srv)
 			delete(c.services, key)
 		}
+	}
+
+	if len(outdated) > 0 {
+		c.recalcEarliestExpiry()
 	}
 
 	return outdated
