@@ -439,14 +439,24 @@ func (s Service) ServicesMetaQueryName() string {
 }
 
 func (s *Service) addIP(ip net.IP, iface *net.Interface) {
-	s.IPs = append(s.IPs, ip)
-	if iface != nil {
-		ifaceIPs := []net.IP{ip}
-		if ips, ok := s.ifaceIPs[iface.Name]; ok {
-			ifaceIPs = append(ips, ip)
-		}
-		s.ifaceIPs[iface.Name] = ifaceIPs
+	if !containsIP(s.IPs, ip) {
+		s.IPs = append(s.IPs, ip)
 	}
+	if iface != nil {
+		ips := s.ifaceIPs[iface.Name]
+		if !containsIP(ips, ip) {
+			s.ifaceIPs[iface.Name] = append(ips, ip)
+		}
+	}
+}
+
+func containsIP(ips []net.IP, ip net.IP) bool {
+	for _, existing := range ips {
+		if existing.Equal(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func newService(instance string) *Service {
