@@ -291,7 +291,12 @@ func (r *responder) unannounce(services []*Service) {
 		}
 	}
 
-	// send on goodbye packet on every interface
+	// One goodbye per interface, then one 250ms pause, then the repeat on
+	// every interface: two passes and a single wait. A per-interface pause
+	// made the walk take 250ms × interfaces — seconds on a host with many
+	// (a macOS box easily has 20+ up multicast interfaces) — which is what
+	// a caller cancelling Respond waited for before its conn was closed.
+	var resps []*Response
 	for name, rrs := range rrsByIfaceName {
 		iface, err := net.InterfaceByName(name)
 		if err != nil {
@@ -302,11 +307,15 @@ func (r *responder) unannounce(services []*Service) {
 		msg.Answer = rrs
 		msg.Response = true
 		msg.Authoritative = true
-		resp := &Response{msg: msg, iface: iface}
+		resps = append(resps, &Response{msg: msg, iface: iface})
+	}
+	for _, resp := range resps {
 		if err := r.conn.SendResponse(resp); err != nil {
 			log.Debug.Println("1st goodbye:", err)
 		}
-		time.Sleep(250 * time.Millisecond)
+	}
+	time.Sleep(250 * time.Millisecond)
+	for _, resp := range resps {
 		if err := r.conn.SendResponse(resp); err != nil {
 			log.Debug.Println("2nd goodbye:", err)
 		}
