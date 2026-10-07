@@ -128,17 +128,26 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 
 			reqAs, reqAAAAs, reqSRVs := splitRecords(filterRecords(rsp, &service))
 
+			// A response with different address records for our hostname is a
+			// conflict. (RFC6762 8.1) The lexicographic tie-break only applies to
+			// the authority records of a simultaneous probe query. (RFC6762 8.2)
+			tiebreak := !rsp.msg.Response
+			if tiebreak {
+				authority := &Request{msg: &dns.Msg{Ns: rsp.msg.Ns}, from: rsp.from, iface: rsp.iface}
+				reqAs, reqAAAAs, _ = splitRecords(filterRecords(authority, &service))
+			}
+
 			as := A(service, rsp.iface)
 			aaaas := AAAA(service, rsp.iface)
 
-			if len(reqAs) > 0 && len(as) > 0 && areDenyingAs(reqAs, as) {
+			if len(reqAs) > 0 && len(as) > 0 && areDenyingAs(reqAs, as, tiebreak) {
 				log.Debug.Printf("%v:%d@%s denies A\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
 				log.Debug.Println(reqAs)
 				log.Debug.Println(as)
 				conflict.hostname = true
 			}
 
-			if len(reqAAAAs) > 0 && len(aaaas) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
+			if len(reqAAAAs) > 0 && len(aaaas) > 0 && areDenyingAAAAs(reqAAAAs, aaaas, tiebreak) {
 				log.Debug.Printf("%v:%d@%s denies AAAA\n", rsp.from.IP, rsp.from.Port, rsp.IfaceName())
 				log.Debug.Println(reqAAAAs)
 				log.Debug.Println(aaaas)
@@ -228,7 +237,9 @@ func (pr probeConflict) hasAny() bool {
 	return pr.hostname || pr.serviceName
 }
 
-func isDenyingA(this *dns.A, that *dns.A) bool {
+// isDenyingA returns true if this denies that. Without tiebreak, any
+// different address denies that.
+func isDenyingA(this *dns.A, that *dns.A, tiebreak bool) bool {
 	if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
 		log.Debug.Println("Same hosts")
 
@@ -240,6 +251,9 @@ func isDenyingA(this *dns.A, that *dns.A) bool {
 		switch compareIP(this.A.To4(), that.A.To4()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
+			if !tiebreak {
+				return true
+			}
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
@@ -251,8 +265,9 @@ func isDenyingA(this *dns.A, that *dns.A) bool {
 	return false
 }
 
-// isDenyingAAAA returns true if this denies that.
-func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
+// isDenyingAAAA returns true if this denies that. Without tiebreak, any
+// different address denies that.
+func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA, tiebreak bool) bool {
 	if strings.EqualFold(this.Hdr.Name, that.Hdr.Name) {
 		log.Debug.Println("Same hosts")
 		if !isValidRR(this) {
@@ -263,6 +278,9 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 		switch compareIP(this.AAAA.To16(), that.AAAA.To16()) {
 		case -1:
 			log.Debug.Println("Lexicographical earlier")
+			if !tiebreak {
+				return true
+			}
 		case 1:
 			log.Debug.Println("Lexicographical later")
 			return true
@@ -275,7 +293,7 @@ func isDenyingAAAA(this *dns.AAAA, that *dns.AAAA) bool {
 }
 
 // areDenyingAs returns true if this and that are denying each other.
-func areDenyingAs(this []*dns.A, that []*dns.A) bool {
+func areDenyingAs(this []*dns.A, that []*dns.A, tiebreak bool) bool {
 	if len(this) != len(that) {
 		log.Debug.Printf("A: different number of records is a conflict (%d != %d)\n", len(this), len(that))
 		return true
@@ -286,7 +304,7 @@ func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 
 	for i, ti := range this {
 		ta := that[i]
-		if isDenyingA(ti, ta) {
+		if isDenyingA(ti, ta, tiebreak) {
 			return true
 		}
 	}
@@ -295,7 +313,7 @@ func areDenyingAs(this []*dns.A, that []*dns.A) bool {
 	return false
 }
 
-func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
+func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA, tiebreak bool) bool {
 	if len(this) != len(that) {
 		log.Debug.Printf("AAAA: different number of records is a conflict (%d != %d)\n", len(this), len(that))
 		return true
@@ -306,7 +324,7 @@ func areDenyingAAAAs(this []*dns.AAAA, that []*dns.AAAA) bool {
 
 	for i, ti := range this {
 		ta := that[i]
-		if isDenyingAAAA(ti, ta) {
+		if isDenyingAAAA(ti, ta, tiebreak) {
 			return true
 		}
 	}

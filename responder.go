@@ -486,12 +486,12 @@ func containsConflictingAnswers(req *Request, handle *serviceHandle) bool {
 	aaaas := AAAA(*handle.service, req.iface)
 	reqAs, reqAAAAs, _ := splitRecords(filterRecords(req, handle.service))
 
-	if len(reqAs) > 0 && areDenyingAs(reqAs, as) {
+	if len(reqAs) > 0 && areDenyingAs(reqAs, as, true) {
 		log.Debug.Printf("%v != %v\n", reqAs, as)
 		return true
 	}
 
-	if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas) {
+	if len(reqAAAAs) > 0 && areDenyingAAAAs(reqAAAAs, aaaas, true) {
 		log.Debug.Printf("%v != %v\n", reqAAAAs, aaaas)
 		return true
 	}

@@ -245,8 +245,83 @@ func TestDenyingAs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if is, want := areDenyingAs(test.This, test.That), test.Result; is != want {
+		if is, want := areDenyingAs(test.This, test.That, true), test.Result; is != want {
 			t.Fatalf("%v != %v is=%v want=%v", test.This, test.That, is, want)
 		}
+	}
+}
+
+// TestProbeHostConflict tests that any response with different address
+// records for our hostname is a conflict (RFC6762 8.1), and that the
+// lexicographic tie-break is only used for the authority records of
+// simultaneous probes (RFC6762 8.2), not for known answers in a query.
+func TestProbeHostConflict(t *testing.T) {
+	tests := []struct {
+		Name     string
+		Response bool
+		Answer   bool // record in the answer section, else in the authority section
+		IP       net.IP
+		Conflict bool
+	}{
+		{"response with lower address", true, true, net.IP{192, 168, 0, 100}, true},
+		{"response with higher address", true, true, net.IP{192, 168, 0, 200}, true},
+		{"response with our own address (filtered)", true, true, net.IP{192, 168, 0, 122}, false},
+		{"probe with lower address", false, false, net.IP{192, 168, 0, 100}, false},
+		{"probe with higher address", false, false, net.IP{192, 168, 0, 200}, true},
+		{"query with known answer higher address", false, true, net.IP{192, 168, 0, 200}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			conn := newTestConn()
+			conn.out = make(chan *dns.Msg, 10)
+
+			srv, err := NewService(Config{
+				Name: "My Service",
+				Type: "_hap._tcp",
+				Host: "My Computer",
+				Port: 12334,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv.ifaceIPs = map[string][]net.IP{
+				testIface.Name: []net.IP{net.IP{192, 168, 0, 122}},
+			}
+
+			a := &dns.A{
+				Hdr: dns.RR_Header{
+					Name:   srv.Hostname(),
+					Rrtype: dns.TypeA,
+					Class:  dns.ClassINET,
+					Ttl:    TTLHostname,
+				},
+				A: test.IP,
+			}
+
+			msg := new(dns.Msg)
+			msg.Response = test.Response
+			if test.Answer {
+				msg.Answer = []dns.RR{a}
+			} else {
+				msg.Ns = []dns.RR{a}
+			}
+
+			go func() {
+				conn.in <- msg
+			}()
+
+			conflict, err := probe(ctx, conn, srv)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if is, want := conflict.hostname, test.Conflict; is != want {
+				t.Fatalf("is=%v want=%v", is, want)
+			}
+		})
 	}
 }
