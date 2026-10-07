@@ -146,8 +146,11 @@ func probe(ctx context.Context, conn MDNSConn, service Service) (conflict probeC
 			}
 
 			// If the service instance name is already taken from another host,
-			// we have a service instance name conflict
-			conflict.serviceName = len(reqSRVs) > 0
+			// we have a service instance name conflict. Once seen, the conflict
+			// must not be cleared by a later packet. (RFC6762 8.1)
+			if len(reqSRVs) > 0 {
+				conflict.serviceName = true
+			}
 
 		case <-ctx.Done():
 			err = ctx.Err()

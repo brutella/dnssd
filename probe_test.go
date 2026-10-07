@@ -250,3 +250,54 @@ func TestDenyingAs(t *testing.T) {
 		}
 	}
 }
+
+// TestProbeServiceNameConflictIsKept tests that a service instance name
+// conflict, once received, is not cleared by a later packet without one
+// (e.g. our own probe query which is looped back). (RFC6762 8.1)
+func TestProbeServiceNameConflictIsKept(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	conn := newTestConn()
+	conn.out = make(chan *dns.Msg, 10)
+
+	srv, err := NewService(Config{
+		Name: "My Service",
+		Type: "_hap._tcp",
+		Host: "My Computer",
+		Port: 12334,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A response from another host which owns the same instance name
+	conflicting := new(dns.Msg)
+	conflicting.Answer = []dns.RR{&dns.SRV{
+		Hdr: dns.RR_Header{
+			Name:   srv.EscapedServiceInstanceName(),
+			Rrtype: dns.TypeSRV,
+			Class:  dns.ClassINET,
+			Ttl:    TTLDefault,
+		},
+		Port:   12334,
+		Target: "Other-Computer.local.",
+	}}
+
+	// Our own probe query, which has no conflicting records
+	own := probeQuery(srv, testIface).msg
+
+	go func() {
+		conn.in <- conflicting
+		conn.in <- own
+	}()
+
+	conflict, err := probe(ctx, conn, srv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if is, want := conflict.serviceName, true; is != want {
+		t.Fatalf("is=%v want=%v", is, want)
+	}
+}
