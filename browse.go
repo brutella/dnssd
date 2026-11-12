@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 )
 
 // BrowseEntry represents a discovered service instance.
@@ -21,7 +22,9 @@ type BrowseEntry struct {
 	Text      map[string]string
 }
 
-// AddFunc is called when a service instance was found.
+// AddFunc is called when a service instance is found. It is called again when
+// the TXT records of an already reported instance change, for example when
+// they arrive after the initial SRV record.
 type AddFunc func(BrowseEntry)
 
 // RmvFunc is called when a service instance disappared.
@@ -109,26 +112,35 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 				}
 
 				for ifaceName, ips := range srv.ifaceIPs {
-					var found = false
+					entry := BrowseEntry{
+						IPs:       uniqueIPs(ips),
+						Host:      srv.Host,
+						Port:      srv.Port,
+						IfaceName: ifaceName,
+						Name:      srv.Name,
+						Type:      srv.Type,
+						Domain:    srv.Domain,
+						Text:      srv.Text,
+					}
+
+					var existing *BrowseEntry
 					for _, e := range es {
-						if e.Name == srv.Name && e.IfaceName == ifaceName {
-							found = true
+						if e.Name == entry.Name && e.IfaceName == entry.IfaceName {
+							existing = e
 							break
 						}
 					}
-					if !found {
-						e := BrowseEntry{
-							IPs:       ips,
-							Host:      srv.Host,
-							Port:      srv.Port,
-							IfaceName: ifaceName,
-							Name:      srv.Name,
-							Type:      srv.Type,
-							Domain:    srv.Domain,
-							Text:      srv.Text,
-						}
-						es = append(es, &e)
-						add(e)
+					if existing == nil {
+						es = append(es, &entry)
+						add(entry)
+						continue
+					}
+					// Records can arrive in separate messages, e.g. a probe
+					// query carries no TXT (RFC 6762 8.1). Report the instance
+					// again once its TXT records change.
+					if !reflect.DeepEqual(existing.Text, entry.Text) {
+						*existing = entry
+						add(entry)
 					}
 				}
 			}
@@ -155,4 +167,20 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 			return ctx.Err()
 		}
 	}
+}
+
+// The cache appends the address records of every received announcement, so a
+// long running lookup accumulates duplicates.
+func uniqueIPs(ips []net.IP) []net.IP {
+	unique := make([]net.IP, 0, len(ips))
+	seen := make(map[string]struct{}, len(ips))
+	for _, ip := range ips {
+		key := ip.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		unique = append(unique, ip)
+	}
+	return unique
 }
