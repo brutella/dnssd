@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 )
 
 // BrowseEntry represents a discovered service instance.
@@ -21,7 +22,9 @@ type BrowseEntry struct {
 	Text      map[string]string
 }
 
-// AddFunc is called when a service instance was found.
+// AddFunc is called when a service instance was found. It is called again for
+// the same instance when its records change, for example when TXT records
+// arrive after the initial SRV record.
 type AddFunc func(BrowseEntry)
 
 // RmvFunc is called when a service instance disappared.
@@ -109,26 +112,35 @@ func lookupType(ctx context.Context, service string, conn MDNSConn, add AddFunc,
 				}
 
 				for ifaceName, ips := range srv.ifaceIPs {
-					var found = false
+					entry := BrowseEntry{
+						IPs:       ips,
+						Host:      srv.Host,
+						Port:      srv.Port,
+						IfaceName: ifaceName,
+						Name:      srv.Name,
+						Type:      srv.Type,
+						Domain:    srv.Domain,
+						Text:      srv.Text,
+					}
+
+					var existing *BrowseEntry
 					for _, e := range es {
-						if e.Name == srv.Name && e.IfaceName == ifaceName {
-							found = true
+						if e.Name == entry.Name && e.IfaceName == entry.IfaceName {
+							existing = e
 							break
 						}
 					}
-					if !found {
-						e := BrowseEntry{
-							IPs:       ips,
-							Host:      srv.Host,
-							Port:      srv.Port,
-							IfaceName: ifaceName,
-							Name:      srv.Name,
-							Type:      srv.Type,
-							Domain:    srv.Domain,
-							Text:      srv.Text,
-						}
-						es = append(es, &e)
-						add(e)
+					if existing == nil {
+						es = append(es, &entry)
+						add(entry)
+						continue
+					}
+					// Records can arrive in separate messages, e.g. a probe
+					// query carries no TXT (RFC 6762 8.1). Report the instance
+					// again once its properties change.
+					if !reflect.DeepEqual(*existing, entry) {
+						*existing = entry
+						add(entry)
 					}
 				}
 			}
